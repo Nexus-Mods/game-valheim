@@ -1,0 +1,6 @@
+3 commits since v5.4.4
+
+Changelog (excluding merges):
+* (2b102fd) [ghorsington] Bump version 5.4.5
+* (28513fb) [ghorsington] Update HarmonyX and MonoMod
+* (e998708) [ghorsington] Update BepInEx.Harmony
