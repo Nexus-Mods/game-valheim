@@ -55,7 +55,10 @@ async function ensureUnstrippedAssemblies(api: types.IExtensionApi, props: IProp
         bbcode: t('Valheim\'s assemblies are distributed in an "optimised" state to reduce required '
         + 'disk space. This unfortunately means that Valheim\'s modding capabilities are also affected.{{br}}{{br}}'
         + 'In order to mod Valheim, the unoptimised/unstripped assemblies are required - please download these '
-        + 'from the nexus.', { replace: { br: '[br][/br]' } }),
+        + 'from Nexus Mods.{{br}}{{br}} You can choose the Vortex/mod manager download or manual download '
+        + '(simply drag and drop the archive into the mods dropzone to add it to Vortex).{{br}}{{br}}'
+        + 'Vortex will then be able to install the assemblies where they are needed to enable '
+        + 'modding, leaving the original ones untouched.', { replace: { br: '[br][/br]' } }),
       }, [
         { label: 'Cancel', action: () => reject(new util.UserCanceled()) },
         {
@@ -147,7 +150,7 @@ function main(context: types.IExtensionContext) {
     return isDependencyRequired(context.api, {
       dependentModType: 'vbuild-mod',
       masterModType: 'inslimvml-mod',
-      masterName: 'BuildShare',
+      masterName: 'BuildShare (AdvancedBuilding)',
       masterURL: 'https://www.nexusmods.com/valheim/mods/5',
       requiredFiles: [ buildShareAssembly ],
     });

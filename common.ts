@@ -57,12 +57,12 @@ export function genProps(context: types.IExtensionContext, profileId?: string): 
     : selectors.lastActiveProfileForGame(state, GAME_ID);
   const profile = selectors.profileById(state, profileId);
   if (profile?.gameId !== GAME_ID) {
-    log('error', 'Invalid profile', { profile });
+    log('debug', 'Invalid profile', { profile });
     return undefined;
   }
   const discovery = util.getSafe(state, ['settings', 'gameMode', 'discovered', GAME_ID], undefined);
   if (discovery?.path === undefined) {
-    log('error', 'Game is not discovered', { profile, discovery });
+    log('debug', 'Game is not discovered', { profile, discovery });
     return undefined;
   }
   return { state, profile, discovery };
