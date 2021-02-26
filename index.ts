@@ -143,13 +143,13 @@ function main(context: types.IExtensionContext) {
 
   const vbuildDepTest = () => {
     const gamePath = getGamePath();
-    const advancedBuilderAssembly = path.join(gamePath, 'InSlimVML', 'Mods', 'CR-AdvancedBuilder.dll');
+    const buildShareAssembly = path.join(gamePath, 'InSlimVML', 'Mods', 'CR-BuildShare_VML.dll');
     return isDependencyRequired(context.api, {
       dependentModType: 'vbuild-mod',
       masterModType: 'inslimvml-mod',
-      masterName: 'AdvancedBuilder',
+      masterName: 'BuildShare',
       masterURL: 'https://www.nexusmods.com/valheim/mods/5',
-      requiredFiles: [ advancedBuilderAssembly ],
+      requiredFiles: [ buildShareAssembly ],
     });
   };
 
@@ -179,7 +179,7 @@ function main(context: types.IExtensionContext) {
       const mod = (input: string) => (input.length > vmlSuffix.length)
         ? path.basename(input).slice(-vmlSuffix.length)
         : '';
-      const testRes = findInstrMatch(instructions, 'cr-advancedbuilder.dll', path.basename)
+      const testRes = findInstrMatch(instructions, 'cr-buildshare_vml.dll', path.basename)
         || findInstrMatch(instructions, '_vml.dll', mod);
       return Bluebird.Promise.Promise.resolve(testRes);
     }, { name: 'InSlimVML Mod' });
@@ -188,7 +188,7 @@ function main(context: types.IExtensionContext) {
     (instructions: types.IInstruction[]) => {
       const res = findInstrMatch(instructions, VBUILD_EXT, path.extname);
       return Bluebird.Promise.Promise.resolve(res);
-    }, { name: 'AdvancedBuild Mod' });
+    }, { name: 'BuildShare Mod' });
 
   context.registerModType('unstripped-assemblies', 20, isSupported, getGamePath,
     (instructions: types.IInstruction[]) => {
