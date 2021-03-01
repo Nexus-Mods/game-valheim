@@ -19,8 +19,9 @@ export async function onWillDeploy(context: types.IExtensionContext,
   try {
     await deployPayload(props);
   } catch (err) {
+    const userCanceled = (err instanceof util.UserCanceled);
     err['attachLogOnReport'] = true;
-    context.api.showErrorNotification('Failed to deploy payload', err);
+    context.api.showErrorNotification('Failed to deploy payload', err, { allowReport: !userCanceled });
   }
 }
 
@@ -33,8 +34,9 @@ export async function onDidPurge(context: types.IExtensionContext,
   try {
     await purgePayload(props);
   } catch (err) {
+    const userCanceled = (err instanceof util.UserCanceled);
     err['attachLogOnReport'] = true;
-    context.api.showErrorNotification('Failed to remove payload', err);
+    context.api.showErrorNotification('Failed to remove payload', err, { allowReport: !userCanceled });
   }
 }
 
