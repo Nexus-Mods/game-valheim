@@ -9,6 +9,8 @@ import { installCoreRemover, installInSlimModLoader, installVBuildMod,
   testCoreRemover, testInSlimModLoader, testVBuild } from './installers';
 import { isDependencyRequired } from './tests';
 
+import { migrateR2ToVortex, userHasR2Installed } from './r2Vortex';
+
 const STOP_PATTERNS = ['config', 'plugins', 'patchers'];
 function toWordExp(input) {
   return '(^|/)' + input + '(/|$)';
@@ -155,6 +157,10 @@ function main(context: types.IExtensionContext) {
       requiredFiles: [ buildShareAssembly ],
     });
   };
+
+  context.registerAction('mod-icons', 115, 'import', {}, 'Import From r2modman', () => {
+    migrateR2ToVortex(context.api);
+  }, () => userHasR2Installed() && getGamePath() !== '.');
 
   context.registerTest('inslim-dep-test', 'gamemode-activated', inSlimVmlDepTest);
   context.registerTest('inslim-dep-test', 'mod-installed', inSlimVmlDepTest);

@@ -1,9 +1,9 @@
 import crypto from 'crypto';
 import path from 'path';
 import { IEntry } from 'turbowalk';
-import { actions, fs, log, selectors, types, util } from 'vortex-api';
+import { fs, types, util } from 'vortex-api';
 
-import { DOORSTOPPER_HOOK, genProps, IProps, walkDirPath } from './common';
+import { DOORSTOPPER_HOOK, genInstructions, genProps, IProps, walkDirPath } from './common';
 
 const PAYLOAD_PATH = path.join(__dirname, 'BepInExPayload');
 const BACKUP_EXT: string = '.vortex_backup';
@@ -21,7 +21,8 @@ export async function onWillDeploy(context: types.IExtensionContext,
   } catch (err) {
     const userCanceled = (err instanceof util.UserCanceled);
     err['attachLogOnReport'] = true;
-    context.api.showErrorNotification('Failed to deploy payload', err, { allowReport: !userCanceled });
+    context.api.showErrorNotification('Failed to deploy payload',
+      err, { allowReport: !userCanceled });
   }
 }
 
@@ -36,7 +37,8 @@ export async function onDidPurge(context: types.IExtensionContext,
   } catch (err) {
     const userCanceled = (err instanceof util.UserCanceled);
     err['attachLogOnReport'] = true;
-    context.api.showErrorNotification('Failed to remove payload', err, { allowReport: !userCanceled });
+    context.api.showErrorNotification('Failed to remove payload',
+      err, { allowReport: !userCanceled });
   }
 }
 
@@ -46,7 +48,9 @@ async function purgePayload(props: IProps) {
   }
   try {
     const fileEntries: IEntry[] = await walkDirPath(PAYLOAD_PATH);
-    const instructions: types.IInstruction[] = genInstructions(props, fileEntries);
+    const srcPath = PAYLOAD_PATH;
+    const destPath = props.discovery.path;
+    const instructions: types.IInstruction[] = genInstructions(srcPath, destPath, fileEntries);
     for (const instr of instructions) {
       await fs.removeAsync(instr.destination)
         .catch({ code: 'ENOENT' }, () => Promise.resolve());
@@ -90,7 +94,9 @@ async function deployPayload(props: IProps) {
   }
   try {
     const fileEntries: IEntry[] = await walkDirPath(PAYLOAD_PATH);
-    const instructions: types.IInstruction[] = genInstructions(props, fileEntries);
+    const srcPath = PAYLOAD_PATH;
+    const destPath = props.discovery.path;
+    const instructions: types.IInstruction[] = genInstructions(srcPath, destPath, fileEntries);
     for (const instr of instructions) {
       if (path.basename(instr.source).toLowerCase() === DOORSTOPPER_HOOK) {
         try {
@@ -134,19 +140,4 @@ function getHash(filePath: string, tries: number = 3) {
         return Promise.reject(err);
       }
     });
-}
-
-function genInstructions(props: IProps, entries: IEntry[]): types.IInstruction[] {
-  const srcPath = PAYLOAD_PATH;
-  const destPath = props.discovery.path;
-  return entries.filter(entry => !entry.isDirectory)
-    .reduce((accum, iter) => {
-      const destination: string = iter.filePath.replace(srcPath, destPath);
-      accum.push({
-        type: 'copy',
-        source: iter.filePath,
-        destination,
-      });
-      return accum;
-    }, []);
 }

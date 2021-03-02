@@ -67,3 +67,18 @@ export function genProps(context: types.IExtensionContext, profileId?: string): 
   }
   return { state, profile, discovery };
 }
+
+export function genInstructions(srcPath: string,
+                                destPath: string,
+                                entries: IEntry[]): types.IInstruction[] {
+  return entries.filter(entry => !entry.isDirectory)
+    .reduce((accum, iter) => {
+      const destination: string = iter.filePath.replace(srcPath, destPath);
+      accum.push({
+        type: 'copy',
+        source: iter.filePath,
+        destination,
+      });
+      return accum;
+    }, []);
+}
