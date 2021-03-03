@@ -52,20 +52,23 @@ export async function migrateR2ToVortex(api: types.IExtensionApi) {
     api.dismissNotification(activityId);
   };
 
-  api.showDialog('info', 'R2 Mods Migration',
+  api.showDialog('info', 'r2modman Mods Migration',
   {
-    bbcode: 'Vortex can attempt to import your R2 Mods Manager mods and allow you to '
-      + 'manage these from inside Vortex - please be aware that these will be imported '
-      + 'in an uninstalled state and will have to be installed, enabled and deployed through ' 
-      + 'Vortex before the mods are re-instated into the game![br][/br][br][/br]'
-      + 'Please note: [list]'
+    bbcode: 'Vortex can import your mods installed with r2modman and allow you to manage them '
+      + 'from inside Vortex. Please be aware that the mods will be imported in an '
+      + 'uninstalled state and will have to be installed, enabled and deployed through '
+      + 'Vortex before the mods are re-instated into the game.[br][/br][br][/br]'
+      + 'Please note: [br][/br][br][/br][list]'
       + '[*]Mod configuration changes will not be imported - these need to be '
-      + 're-added or imported manually from your preferred R2 profile'
-      + '[*]Vortex will import ALL versions of the mods you have in your R2 Mod Manager cache, '
-      + 'even the outdated ones - it\'s up to you to sift through the imported mods and install '
-      + 'the ones you want active in-game '
-      + '[*]It is still highly recommended to use a fresh vanilla copy of the game when '
-      + 'starting to mod with Vortex[/list]',
+      + 're-added or imported manually from your preferred r2modman profile.'
+      + '[*]Vortex will import ALL versions of the mods you have in your r2modman cache, even '
+      + 'the outdated ones - it\'s up to you to look through the imported mods and install '
+      + 'the ones you want active in-game.'
+      + '[*]r2modman stores recently uninstalled mods in its cache meaning that Vortex might '
+      + 'import mods you recently uninstalled in r2modman. You can simply choose to not '
+      + 'install or remove them entirely after importing. '
+      + '[/list][br][/br]It is still highly recommended to use a fresh vanilla copy of the game when '
+      + 'starting to mod with Vortex.',
   }, [
     { label: 'Cancel', action: () => Promise.resolve() },
     { label: 'Start Migration', action: () => start() },
