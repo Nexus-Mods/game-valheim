@@ -13,7 +13,7 @@ export const DOORSTOPPER_HOOK = 'winhttp.dll';
 //  Needless to say, we don't want these deployed or reporting any conflicts as
 //  Vortex is already distributing them.
 export const IGNORABLE_FILES = [
-  'manifest.json', 'BepInEx.cfg', '0Harmony.dll', 'doorstop_config.ini',
+  'manifest.json', 'BepInEx.cfg', '0Harmony.dll', 'doorstop_config.ini', 'icon.png', 'readme.md',
   '0Harmony.xml', '0Harmony20.dll', 'BepInEx.dll', 'BepInEx.Harmony.dll', 'BepInEx.Harmony.xml',
   'BepInEx.Preloader.dll', 'BepInEx.Preloader.xml', 'BepInEx.xml', 'HarmonyXInterop.dll',
   'Mono.Cecil.dll', 'Mono.Cecil.Mdb.dll', 'Mono.Cecil.Pdb.dll', 'Mono.Cecil.Rocks.dll',
