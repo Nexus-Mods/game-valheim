@@ -2,8 +2,8 @@ import Promise from 'bluebird';
 import semver from 'semver';
 import { types } from 'vortex-api';
 
-export function migrate102(api: types.IExtensionApi, oldVersion: string) {
-  if (semver.gte(oldVersion, '1.0.2')) {
+export function migrate103(api: types.IExtensionApi, oldVersion: string) {
+  if (semver.gte(oldVersion, '1.0.3')) {
     return Promise.resolve();
   }
 

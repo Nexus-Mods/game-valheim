@@ -8,7 +8,7 @@ import { FBX_EXT, GAME_ID, genProps, IGNORABLE_FILES, INSLIMVML_IDENTIFIER,
   IProps, OBJ_EXT, STEAM_ID, VBUILD_EXT } from './common';
 import { installCoreRemover, installFullPack, installInSlimModLoader, installVBuildMod,
   testCoreRemover, testFullPack, testInSlimModLoader, testVBuild } from './installers';
-import { migrate102 } from './migrations';
+import { migrate103 } from './migrations';
 import { isDependencyRequired } from './tests';
 
 import { migrateR2ToVortex, userHasR2Installed } from './r2Vortex';
@@ -230,7 +230,7 @@ function main(context: types.IExtensionContext) {
   context.registerInstaller('valheim-vbuild', 20, testVBuild, installVBuildMod);
   context.registerInstaller('valheim-full-bep-pack', 10, testFullPack, installFullPack);
 
-  context.registerMigration((oldVersion: string) => migrate102(context.api, oldVersion));
+  context.registerMigration((oldVersion: string) => migrate103(context.api, oldVersion));
 
   context.registerModType('inslimvml-mod-loader', 20, isSupported, getGamePath,
     (instructions: types.IInstruction[]) => {
@@ -306,12 +306,18 @@ function main(context: types.IExtensionContext) {
     }, { name: 'BepInEx Root Mod' });
 
   context.once(() => {
-    context.api.onAsync('will-deploy', async (profileId) =>
-      payloadDeployer.onWillDeploy(context, profileId)
+    context.api.onAsync('will-deploy', async (profileId) => {
+      const state = context.api.getState();
+      const profile = selectors.profileById(state, profileId);
+      if (profile?.gameId !== GAME_ID) {
+        return Promise.resolve();
+      }
+      return payloadDeployer.onWillDeploy(context, profileId)
         .then(() => ensureUnstrippedAssemblies(genProps(context, profileId)))
         .catch(err => err instanceof util.UserCanceled
           ? Promise.resolve()
-          : Promise.reject(err)));
+          : Promise.reject(err));
+    });
 
     context.api.onAsync('did-purge', async (profileId) =>
       payloadDeployer.onDidPurge(context, profileId));

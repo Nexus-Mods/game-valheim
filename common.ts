@@ -26,7 +26,7 @@ export const IGNORABLE_FILES = [
 ];
 
 export interface IProps {
-  api?: types.IExtensionApi;
+  api: types.IExtensionApi;
   state: types.IState;
   profile: types.IProfile;
   discovery: types.IDiscoveryResult;
