@@ -8,6 +8,7 @@ import { FBX_EXT, GAME_ID, genProps, IGNORABLE_FILES, INSLIMVML_IDENTIFIER,
   IProps, OBJ_EXT, STEAM_ID, VBUILD_EXT } from './common';
 import { installCoreRemover, installFullPack, installInSlimModLoader, installVBuildMod,
   testCoreRemover, testFullPack, testInSlimModLoader, testVBuild } from './installers';
+import { migrate102 } from './migrations';
 import { isDependencyRequired } from './tests';
 
 import { migrateR2ToVortex, userHasR2Installed } from './r2Vortex';
@@ -228,6 +229,8 @@ function main(context: types.IExtensionContext) {
   context.registerInstaller('valheim-inslimvm', 20, testInSlimModLoader, installInSlimModLoader);
   context.registerInstaller('valheim-vbuild', 20, testVBuild, installVBuildMod);
   context.registerInstaller('valheim-full-bep-pack', 10, testFullPack, installFullPack);
+
+  context.registerMigration((oldVersion: string) => migrate102(context.api, oldVersion));
 
   context.registerModType('inslimvml-mod-loader', 20, isSupported, getGamePath,
     (instructions: types.IInstruction[]) => {
