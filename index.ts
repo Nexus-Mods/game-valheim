@@ -6,8 +6,8 @@ import * as payloadDeployer from './payloadDeployer';
 
 import { FBX_EXT, GAME_ID, genProps, IGNORABLE_FILES, INSLIMVML_IDENTIFIER,
   IProps, OBJ_EXT, STEAM_ID, VBUILD_EXT } from './common';
-import { installCoreRemover, installInSlimModLoader, installVBuildMod,
-  testCoreRemover, testInSlimModLoader, testVBuild } from './installers';
+import { installCoreRemover, installFullPack, installInSlimModLoader, installVBuildMod,
+  testCoreRemover, testFullPack, testInSlimModLoader, testVBuild } from './installers';
 import { isDependencyRequired } from './tests';
 
 import { migrateR2ToVortex, userHasR2Installed } from './r2Vortex';
@@ -37,7 +37,8 @@ function requiresLauncher(gamePath) {
     .catch(err => Promise.reject(err));
 }
 
-async function ensureUnstrippedAssemblies(api: types.IExtensionApi, props: IProps): Promise<void> {
+async function ensureUnstrippedAssemblies(props: IProps): Promise<void> {
+  const api = props.api;
   const t = api.translate;
   const expectedFilePath = path.join(props.discovery.path,
     'unstripped_managed', 'mono.security.dll');
@@ -64,21 +65,39 @@ async function ensureUnstrippedAssemblies(api: types.IExtensionApi, props: IProp
     ]);
   });
 
+  const assignOverridePath = async (overridePath: string) => {
+    const doorStopConfig = path.join(props.discovery.path, 'doorstop_config.ini');
+    const parser = new Parser(new WinapiFormat());
+    try {
+      const iniData: IniFile<any> = await parser.read(doorStopConfig);
+      iniData.data['UnityDoorstop']['dllSearchPathOverride'] = overridePath;
+      await parser.write(doorStopConfig, iniData);
+    } catch (err) {
+      api.showErrorNotification('failed to modify doorstop configuration', err);
+    }
+  };
+
+  const mods: { [modId: string]: types.IMod } =
+    util.getSafe(props.state, ['persistent', 'mods', GAME_ID], {});
+  const coreLibModId = Object.keys(mods).find(key =>
+    util.getSafe(mods[key], ['attributes', 'IsCoreLibMod'], false));
+  if (coreLibModId !== undefined) {
+    const isCoreLibModEnabled = util.getSafe(props.profile,
+      ['modState', coreLibModId, 'enabled'], false);
+    if (isCoreLibModEnabled) {
+      assignOverridePath('BepInEx\\core_lib');
+      return;
+    }
+  }
   for (const filePath of [fullPackCorLib, expectedFilePath]) {
     try {
       await fs.statAsync(filePath);
       const dllOverridePath = filePath.replace(props.discovery.path + path.sep, '')
                                       .replace(path.sep + 'mono.security.dll', '');
-      const doorStopConfig = path.join(props.discovery.path, 'doorstop_config.ini');
-      const parser = new Parser(new WinapiFormat());
-      const iniData: IniFile<any> = await parser.read(doorStopConfig);
-      iniData.data['UnityDoorstop']['dllSearchPathOverride'] = dllOverridePath;
-      await parser.write(doorStopConfig, iniData);
+      await assignOverridePath(dllOverridePath);
       return;
     } catch (err) {
-      if (!['ENOENT', 'EPERM'].includes(err.code)) {
-        api.showErrorNotification('failed to modify doorstop configuration', err);
-      }
+      // nop
     }
   }
 
@@ -102,7 +121,7 @@ function prepareForModding(context: types.IExtensionContext, discovery: types.ID
     .then(() => payloadDeployer.onWillDeploy(context, profile?.id))
     .then(() => resolve())
     .catch(err => reject(err)))
-  .then(() => ensureUnstrippedAssemblies(context.api, { state, profile, discovery }));
+  .then(() => ensureUnstrippedAssemblies({ api: context.api, state, profile, discovery }));
 }
 
 function modsPath(gamePath: string) {
@@ -208,6 +227,7 @@ function main(context: types.IExtensionContext) {
   context.registerInstaller('valheim-core-remover', 20, testCoreRemover, installCoreRemover);
   context.registerInstaller('valheim-inslimvm', 20, testInSlimModLoader, installInSlimModLoader);
   context.registerInstaller('valheim-vbuild', 20, testVBuild, installVBuildMod);
+  context.registerInstaller('valheim-full-bep-pack', 10, testFullPack, installFullPack);
 
   context.registerModType('inslimvml-mod-loader', 20, isSupported, getGamePath,
     (instructions: types.IInstruction[]) => {
@@ -285,7 +305,7 @@ function main(context: types.IExtensionContext) {
   context.once(() => {
     context.api.onAsync('will-deploy', async (profileId) =>
       payloadDeployer.onWillDeploy(context, profileId)
-        .then(() => ensureUnstrippedAssemblies(context.api, genProps(context, profileId)))
+        .then(() => ensureUnstrippedAssemblies(genProps(context, profileId)))
         .catch(err => err instanceof util.UserCanceled
           ? Promise.resolve()
           : Promise.reject(err)));

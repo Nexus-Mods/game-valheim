@@ -113,7 +113,7 @@ async function deployPayload(props: IProps) {
     const instructions: types.IInstruction[] = genInstructions(srcPath, destPath, fileEntries);
     for (const instr of instructions) {
       if (isVMLEnabled && instr.type === 'copy') {
-        if(ISVML_SKIP.includes(path.basename(instr.source).toLowerCase())) {
+        if (ISVML_SKIP.includes(path.basename(instr.source).toLowerCase())) {
           // If InSlim is installed and enabled, don't bother with BIX_SVML patcher
           //  or its requirements
           continue;

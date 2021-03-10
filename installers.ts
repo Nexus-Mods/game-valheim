@@ -128,3 +128,65 @@ export function installCoreRemover(files: string[], destinationPath: string, gam
 
   return Promise.resolve({ instructions });
 }
+
+export function testFullPack(files: string[], gameId: string): Promise<types.ISupportedResult> {
+  if (gameId !== GAME_ID) {
+    return Promise.resolve({ supported: false, requiredFiles: [] });
+  }
+  let supported = false;
+  for (const file of files) {
+    const segments = file.split(path.sep).map(seg => seg.toLowerCase());
+    const coreLibIdx = segments.findIndex(seg => seg === 'core_lib');
+    if (coreLibIdx === -1) {
+      continue;
+    }
+
+    if (coreLibIdx > 1 && segments[coreLibIdx - 1] === 'bepinex') {
+      supported = true;
+      break;
+    }
+  }
+  return Promise.resolve({ supported, requiredFiles: [] });
+}
+
+export function installFullPack(files: string[], destinationPath: string, gameId: string) {
+  let coreLibIdx = -1;
+  const filtered = files.filter(file => {
+    const segments = file.split(path.sep).map(seg => seg.toLowerCase());
+    if (!path.extname(segments[segments.length - 1])) {
+      return false;
+    }
+    if (coreLibIdx === -1) {
+      const potentialMatch = segments.findIndex(seg => seg === 'core_lib');
+      if (potentialMatch > 1 && segments[potentialMatch - 1] === 'bepinex') {
+        coreLibIdx = potentialMatch;
+        return true;
+      }
+    } else {
+      if ((segments[coreLibIdx - 1] === 'bepinex')
+        && (segments[coreLibIdx] === 'core_lib')) {
+        return true;
+      }
+    }
+    return false;
+  });
+
+  const modTypeInstr: types.IInstruction = {
+    type: 'setmodtype',
+    value: 'bepinex-root-mod',
+  };
+
+  const modAttribInstr: types.IInstruction = {
+    type: 'attribute',
+    key: 'IsCoreLibMod',
+    value: 'true',
+  };
+  const instructions: types.IInstruction[] = [modTypeInstr, modAttribInstr]
+    .concat(filtered.map(file => ({
+      type: 'copy',
+      source: file,
+      destination: file.split(path.sep).slice(coreLibIdx).join(path.sep),
+  })));
+
+  return Promise.resolve({ instructions });
+}
