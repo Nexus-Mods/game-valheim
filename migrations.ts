@@ -17,7 +17,7 @@ export function migrate102(api: types.IExtensionApi, oldVersion: string) {
       {
         title: 'More',
         action: (dismiss) => {
-          api.showDialog('info', 'Ingame Mod Configuration Manager added.',
+          api.showDialog('info', 'Ingame Mod Configuration Manager added',
           {
             bbcode: t('Some (but not all) Valheim mods come with configuration files allowing '
               + 'you to tweak mod specific settings. Once you\'ve installed one or several '
