@@ -5,15 +5,19 @@ export const GAME_ID = 'valheim';
 export const STEAM_ID = '892970';
 
 export const VBUILD_EXT = '.vbuild';
+export const FBX_EXT = '.fbx';
+export const OBJ_EXT = '.obj';
 export const INSLIMVML_IDENTIFIER = 'inslimvml.ini';
 export const DOORSTOPPER_HOOK = 'winhttp.dll';
+export const BIX_SVML = 'slimvml.loader.dll';
+export const ISVML_SKIP = [BIX_SVML, 'slimassist.dll', '0harmony.dll'];
 
 // These are files which are crucial to Valheim's modding pattern and it appears
 //  that many mods on Vortex are currently distributing these as part of their mod.
 //  Needless to say, we don't want these deployed or reporting any conflicts as
 //  Vortex is already distributing them.
 export const IGNORABLE_FILES = [
-  'manifest.json', 'BepInEx.cfg', '0Harmony.dll', 'doorstop_config.ini', 'icon.png', 'README.md',
+  'LICENSE', 'manifest.json', 'BepInEx.cfg', '0Harmony.dll', 'doorstop_config.ini', 'icon.png', 'README.md',
   '0Harmony.xml', '0Harmony20.dll', 'BepInEx.dll', 'BepInEx.Harmony.dll', 'BepInEx.Harmony.xml',
   'BepInEx.Preloader.dll', 'BepInEx.Preloader.xml', 'BepInEx.xml', 'HarmonyXInterop.dll',
   'Mono.Cecil.dll', 'Mono.Cecil.Mdb.dll', 'Mono.Cecil.Pdb.dll', 'Mono.Cecil.Rocks.dll',
@@ -22,6 +26,7 @@ export const IGNORABLE_FILES = [
 ];
 
 export interface IProps {
+  api?: types.IExtensionApi;
   state: types.IState;
   profile: types.IProfile;
   discovery: types.IDiscoveryResult;
@@ -57,15 +62,16 @@ export function genProps(context: types.IExtensionContext, profileId?: string): 
     : selectors.lastActiveProfileForGame(state, GAME_ID);
   const profile = selectors.profileById(state, profileId);
   if (profile?.gameId !== GAME_ID) {
-    log('debug', 'Invalid profile', { profile });
+    // This is too spammy.
+    // log('debug', 'Invalid profile', { profile });
     return undefined;
   }
   const discovery = util.getSafe(state, ['settings', 'gameMode', 'discovered', GAME_ID], undefined);
   if (discovery?.path === undefined) {
-    log('debug', 'Game is not discovered', { profile, discovery });
+    // log('debug', 'Game is not discovered', { profile, discovery });
     return undefined;
   }
-  return { state, profile, discovery };
+  return { api: context.api, state, profile, discovery };
 }
 
 export function genInstructions(srcPath: string,

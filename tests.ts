@@ -55,20 +55,22 @@ export function isDependencyRequired(api: types.IExtensionApi, dependencyTest: I
       : Promise.reject(new util.NotFound(dependencyTest.masterModType));
   };
 
+  const hasDependentMods = modIds.find(id =>
+    mods[id]?.type === dependencyTest.dependentModType) !== undefined;
+
   if (masterMods.length > 0) {
     if (dependencyTest.requiredFiles === undefined) {
       return Promise.resolve(undefined);
     }
 
-    fixAppliedTest = () => Promise.each(dependencyTest.requiredFiles, iter => fs.statAsync(iter))
-      .then(() => Promise.resolve());
+    fixAppliedTest = () => (hasDependentMods)
+      ? Promise.each(dependencyTest.requiredFiles, iter => fs.statAsync(iter))
+        .then(() => Promise.resolve())
+      : Promise.resolve();
     return fixAppliedTest()
       .then(() => Promise.resolve(undefined))
       .catch(err => Promise.resolve(genFailedTestRes(fixAppliedTest)));
   }
-
-  const hasDependentMods = modIds.find(id =>
-    mods[id]?.type === dependencyTest.dependentModType) !== undefined;
 
   if (hasDependentMods) {
     return Promise.resolve(genFailedTestRes(fixAppliedTest));

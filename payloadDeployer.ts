@@ -3,7 +3,8 @@ import path from 'path';
 import { IEntry } from 'turbowalk';
 import { fs, types, util } from 'vortex-api';
 
-import { DOORSTOPPER_HOOK, genInstructions, genProps, IProps, walkDirPath } from './common';
+import { DOORSTOPPER_HOOK, GAME_ID, genInstructions, genProps, IProps,
+  ISVML_SKIP, walkDirPath } from './common';
 
 const PAYLOAD_PATH = path.join(__dirname, 'BepInExPayload');
 const BACKUP_EXT: string = '.vortex_backup';
@@ -88,16 +89,36 @@ async function ensureLatest(instruction: types.IInstruction) {
   }
 }
 
+async function isISVMLEnabled(props: IProps) {
+  const mods = util.getSafe(props.state, ['persistent', 'mods', GAME_ID], {});
+  const inSlimId = Object.keys(mods).find(key => mods[key].type === 'inslimvml-mod-loader');
+  if (inSlimId === undefined) {
+    return false;
+  }
+
+  const manifest: types.IDeploymentManifest = await util.getManifest(props.api, 'inslimvml-mod-loader', GAME_ID);
+  const isDeployed = manifest.files.length > 0;
+  return isDeployed || util.getSafe(props.profile, ['modState', inSlimId, 'enabled'], false);
+}
+
 async function deployPayload(props: IProps) {
   if (props === undefined) {
     return;
   }
+  const isVMLEnabled = await isISVMLEnabled(props);
   try {
     const fileEntries: IEntry[] = await walkDirPath(PAYLOAD_PATH);
     const srcPath = PAYLOAD_PATH;
     const destPath = props.discovery.path;
     const instructions: types.IInstruction[] = genInstructions(srcPath, destPath, fileEntries);
     for (const instr of instructions) {
+      if (isVMLEnabled && instr.type === 'copy') {
+        if(ISVML_SKIP.includes(path.basename(instr.source).toLowerCase())) {
+          // If InSlim is installed and enabled, don't bother with BIX_SVML patcher
+          //  or its requirements
+          continue;
+        }
+      }
       if (path.basename(instr.source).toLowerCase() === DOORSTOPPER_HOOK) {
         try {
           // Check if InSlim is installed and is overwriting our doorstopper.
@@ -112,7 +133,7 @@ async function deployPayload(props: IProps) {
         .catch({ code: 'EEXIST' }, () => ensureLatest(instr));
     }
   } catch (err) {
-    throw err;
+    return Promise.reject(err);
   }
 }
 

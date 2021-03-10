@@ -106,7 +106,6 @@ async function startMigration(api: types.IExtensionApi) {
     ? Promise.resolve() : Promise.reject(err));
 
   const verRgx = new RegExp(/^\d\.\d\.\d{1,4}$/);
-  //const destination = path.join(discovery.path, 'BepInEx', 'plugins');
   // tslint:disable-next-line: max-line-length
   const arcMap: { [arcName: string]: IR2ModFile[] } = fileEntries.reduce((accum, iter) => {
     const segments = iter.filePath.split(path.sep);
@@ -135,6 +134,7 @@ async function startMigration(api: types.IExtensionApi) {
   for (const modKey of Object.keys(arcMap)) {
     const archivePath = path.join(downloadsPath, modKey + '.zip');
     await szip.add(archivePath, arcMap[modKey]
-      .map(r2ModFile => path.join(r2ModFile.basePath, r2ModFile.relPath.split(path.sep)[0])), { raw: ['-r'] });
+      .map(r2ModFile => path.join(r2ModFile.basePath,
+        r2ModFile.relPath.split(path.sep)[0])), { raw: ['-r'] });
   }
 }

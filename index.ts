@@ -1,10 +1,11 @@
 import Bluebird from 'bluebird';
 import * as path from 'path';
 import { fs, selectors, types, util } from 'vortex-api';
+import Parser, { IniFile, WinapiFormat } from 'vortex-parse-ini';
 import * as payloadDeployer from './payloadDeployer';
 
-import { GAME_ID, genProps, IGNORABLE_FILES, INSLIMVML_IDENTIFIER,
-  IProps, STEAM_ID, VBUILD_EXT } from './common';
+import { FBX_EXT, GAME_ID, genProps, IGNORABLE_FILES, INSLIMVML_IDENTIFIER,
+  IProps, OBJ_EXT, STEAM_ID, VBUILD_EXT } from './common';
 import { installCoreRemover, installInSlimModLoader, installVBuildMod,
   testCoreRemover, testInSlimModLoader, testVBuild } from './installers';
 import { isDependencyRequired } from './tests';
@@ -40,51 +41,67 @@ async function ensureUnstrippedAssemblies(api: types.IExtensionApi, props: IProp
   const t = api.translate;
   const expectedFilePath = path.join(props.discovery.path,
     'unstripped_managed', 'mono.security.dll');
+  const fullPackCorLib = path.join(props.discovery.path,
+    'BepInEx', 'core_lib', 'mono.security.dll');
 
-  const mods: { [modId: string]: types.IMod }
-    = util.getSafe(props.state, ['persistent', 'mods', GAME_ID], {});
+  const raiseMissingAssembliesDialog = () => new Promise<void>((resolve, reject) => {
+    api.showDialog('info', 'Missing unstripped assemblies', {
+      bbcode: t('Valheim\'s assemblies are distributed in an "optimised" state to reduce required '
+      + 'disk space. This unfortunately means that Valheim\'s modding capabilities are also affected.{{br}}{{br}}'
+      + 'In order to mod Valheim, the unoptimised/unstripped assemblies are required - please download these '
+      + 'from Nexus Mods.{{br}}{{br}} You can choose the Vortex/mod manager download or manual download '
+      + '(simply drag and drop the archive into the mods dropzone to add it to Vortex).{{br}}{{br}}'
+      + 'Vortex will then be able to install the assemblies where they are needed to enable '
+      + 'modding, leaving the original ones untouched.', { replace: { br: '[br][/br]' } }),
+    }, [
+      { label: 'Cancel', action: () => reject(new util.UserCanceled()) },
+      {
+        label: 'Download Unstripped Assemblies',
+        action: () => util.opn('https://www.nexusmods.com/valheim/mods/15')
+          .catch(err => null)
+          .finally(() => resolve()),
+      },
+    ]);
+  });
 
-  const hasUnstrippedMod = Object.keys(mods).filter(key => mods[key]?.type === 'unstripped-assemblies').length > 0;
-  if (hasUnstrippedMod) {
-    return Promise.resolve();
+  for (const filePath of [fullPackCorLib, expectedFilePath]) {
+    try {
+      await fs.statAsync(filePath);
+      const dllOverridePath = filePath.replace(props.discovery.path + path.sep, '')
+                                      .replace(path.sep + 'mono.security.dll', '');
+      const doorStopConfig = path.join(props.discovery.path, 'doorstop_config.ini');
+      const parser = new Parser(new WinapiFormat());
+      const iniData: IniFile<any> = await parser.read(doorStopConfig);
+      iniData.data['UnityDoorstop']['dllSearchPathOverride'] = dllOverridePath;
+      await parser.write(doorStopConfig, iniData);
+      return;
+    } catch (err) {
+      if (!['ENOENT', 'EPERM'].includes(err.code)) {
+        api.showErrorNotification('failed to modify doorstop configuration', err);
+      }
+    }
   }
-  try {
-    await fs.statAsync(expectedFilePath);
-    return;
-  } catch (err) {
-    return new Promise((resolve, reject) => {
-      api.showDialog('info', 'Missing unstripped assemblies', {
-        bbcode: t('Valheim\'s assemblies are distributed in an "optimised" state to reduce required '
-        + 'disk space. This unfortunately means that Valheim\'s modding capabilities are also affected.{{br}}{{br}}'
-        + 'In order to mod Valheim, the unoptimised/unstripped assemblies are required - please download these '
-        + 'from Nexus Mods.{{br}}{{br}} You can choose the Vortex/mod manager download or manual download '
-        + '(simply drag and drop the archive into the mods dropzone to add it to Vortex).{{br}}{{br}}'
-        + 'Vortex will then be able to install the assemblies where they are needed to enable '
-        + 'modding, leaving the original ones untouched.', { replace: { br: '[br][/br]' } }),
-      }, [
-        { label: 'Cancel', action: () => reject(new util.UserCanceled()) },
-        {
-          label: 'Download Unstripped Assemblies',
-          action: () => util.opn('https://www.nexusmods.com/valheim/mods/15')
-            .catch(err => null)
-            .finally(() => resolve()),
-        },
-      ]);
-    });
-  }
+
+  return raiseMissingAssembliesDialog();
 }
 
 function prepareForModding(context: types.IExtensionContext, discovery: types.IDiscoveryResult) {
   const state = context.api.getState();
   const profile: types.IProfile = selectors.activeProfile(state);
-  return new Bluebird<void>((resolve, reject) => {
-    return fs.ensureDirWritableAsync(modsPath(discovery.path))
-      .then(() => fs.ensureDirWritableAsync(path.join(discovery.path, 'InSlimVML', 'Mods')))
-      .then(() => fs.ensureDirWritableAsync(path.join(discovery.path, 'AdvancedBuilder', 'Builds')))
-      .then(() => payloadDeployer.onWillDeploy(context, profile?.id))
-      .then(() => resolve())
-      .catch(err => reject(err));
-  })
+  const modTypes: { [typeId: string]: string } = selectors.modPathsForGame(state, profile.gameId);
+  const createDirectories = async () => {
+    for (const modType of Object.keys(modTypes)) {
+      try {
+        await fs.ensureDirWritableAsync(modTypes[modType]);
+      } catch (err) {
+        return Promise.reject(err);
+      }
+    }
+  };
+  return new Bluebird<void>((resolve, reject) => createDirectories()
+    .then(() => payloadDeployer.onWillDeploy(context, profile?.id))
+    .then(() => resolve())
+    .catch(err => reject(err)))
   .then(() => ensureUnstrippedAssemblies(context.api, { state, profile, discovery }));
 }
 
@@ -139,13 +156,6 @@ function main(context: types.IExtensionContext) {
       mod(instr.source).toLowerCase() === pattern.toLowerCase());
   };
 
-  const inSlimVmlDepTest = () => isDependencyRequired(context.api, {
-    dependentModType: 'inslimvml-mod',
-    masterModType: 'inslimvml-mod-loader',
-    masterName: 'InSlimVML',
-    masterURL: 'https://www.nexusmods.com/valheim/mods/21',
-  });
-
   const vbuildDepTest = () => {
     const gamePath = getGamePath();
     const buildShareAssembly = path.join(gamePath, 'InSlimVML', 'Mods', 'CR-BuildShare_VML.dll');
@@ -158,15 +168,42 @@ function main(context: types.IExtensionContext) {
     });
   };
 
+  const customMeshesTest = () => {
+    const basePath = modsPath(getGamePath());
+    const requiredAssembly = path.join(basePath, 'CustomMeshes.dll');
+    return isDependencyRequired(context.api, {
+      dependentModType: 'valheim-custom-meshes',
+      masterModType: '',
+      masterName: 'CustomMeshes',
+      masterURL: 'https://www.nexusmods.com/valheim/mods/184',
+      requiredFiles: [ requiredAssembly ],
+    });
+  };
+
+  const customTexturesTest = () => {
+    const basePath = modsPath(getGamePath());
+    const requiredAssembly = path.join(basePath, 'CustomTextures.dll');
+    return isDependencyRequired(context.api, {
+      dependentModType: 'valheim-custom-textures',
+      masterModType: '',
+      masterName: 'CustomTextures',
+      masterURL: 'https://www.nexusmods.com/valheim/mods/48',
+      requiredFiles: [ requiredAssembly ],
+    });
+  };
+
   context.registerAction('mod-icons', 115, 'import', {}, 'Import From r2modman', () => {
     migrateR2ToVortex(context.api);
   }, () => userHasR2Installed() && getGamePath() !== '.');
 
-  context.registerTest('inslim-dep-test', 'gamemode-activated', inSlimVmlDepTest);
-  context.registerTest('inslim-dep-test', 'mod-installed', inSlimVmlDepTest);
-
   context.registerTest('vbuild-dep-test', 'gamemode-activated', vbuildDepTest);
   context.registerTest('vbuild-dep-test', 'mod-installed', vbuildDepTest);
+
+  context.registerTest('textures-dep-test', 'gamemode-activated', customMeshesTest);
+  context.registerTest('textures-dep-test', 'mod-installed', customMeshesTest);
+
+  context.registerTest('meshes-dep-test', 'gamemode-activated', customTexturesTest);
+  context.registerTest('meshes-dep-test', 'mod-installed', customTexturesTest);
 
   context.registerInstaller('valheim-core-remover', 20, testCoreRemover, installCoreRemover);
   context.registerInstaller('valheim-inslimvm', 20, testInSlimModLoader, installInSlimModLoader);
@@ -199,6 +236,29 @@ function main(context: types.IExtensionContext) {
       return Bluebird.Promise.Promise.resolve(res);
     }, { name: 'BuildShare Mod' });
 
+  context.registerModType('valheim-custom-meshes', 10, isSupported,
+    () => path.join(modsPath(getGamePath()), 'CustomMeshes'),
+    (instructions: types.IInstruction[]) => {
+      const supported = findInstrMatch(instructions, FBX_EXT, path.extname)
+        || findInstrMatch(instructions, OBJ_EXT, path.extname);
+      return Bluebird.Promise.Promise.resolve(supported);
+    }, { name: 'CustomMeshes Mod' });
+
+  context.registerModType('valheim-custom-textures', 10, isSupported,
+    () => path.join(modsPath(getGamePath()), 'CustomTextures'),
+    (instructions: types.IInstruction[]) => {
+      const textureRgx: RegExp = new RegExp(/^texture_.*.png$/);
+      let supported = false;
+      for (const instr of instructions) {
+        if ((instr.type === 'copy')
+          && textureRgx.test(path.basename(instr.source).toLowerCase())) {
+            supported = true;
+            break;
+        }
+      }
+      return Bluebird.Promise.Promise.resolve(supported);
+    }, { name: 'CustomTextures Mod' });
+
   context.registerModType('unstripped-assemblies', 20, isSupported, getGamePath,
     (instructions: types.IInstruction[]) => {
       const testPath = path.join('unstripped_managed', 'mono.posix.dll');
@@ -224,7 +284,11 @@ function main(context: types.IExtensionContext) {
 
   context.once(() => {
     context.api.onAsync('will-deploy', async (profileId) =>
-      payloadDeployer.onWillDeploy(context, profileId));
+      payloadDeployer.onWillDeploy(context, profileId)
+        .then(() => ensureUnstrippedAssemblies(context.api, genProps(context, profileId)))
+        .catch(err => err instanceof util.UserCanceled
+          ? Promise.resolve()
+          : Promise.reject(err)));
 
     context.api.onAsync('did-purge', async (profileId) =>
       payloadDeployer.onDidPurge(context, profileId));
