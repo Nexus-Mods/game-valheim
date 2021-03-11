@@ -108,7 +108,7 @@ async function ensureUnstrippedAssemblies(props: IProps): Promise<void> {
 function prepareForModding(context: types.IExtensionContext, discovery: types.IDiscoveryResult) {
   const state = context.api.getState();
   const profile: types.IProfile = selectors.activeProfile(state);
-  const modTypes: { [typeId: string]: string } = selectors.modPathsForGame(state, profile.gameId);
+  const modTypes: { [typeId: string]: string } = selectors.modPathsForGame(state, GAME_ID);
   const createDirectories = async () => {
     for (const modType of Object.keys(modTypes)) {
       try {
