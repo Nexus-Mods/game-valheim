@@ -1,17 +1,23 @@
 import Bluebird from 'bluebird';
+import { app as appIn, remote } from 'electron';
 import * as path from 'path';
 import { fs, selectors, types, util } from 'vortex-api';
 import Parser, { IniFile, WinapiFormat } from 'vortex-parse-ini';
 import * as payloadDeployer from './payloadDeployer';
 
-import { FBX_EXT, GAME_ID, genProps, IGNORABLE_FILES, INSLIMVML_IDENTIFIER,
+import { BETTER_CONT_EXT, FBX_EXT, GAME_ID, genProps, IGNORABLE_FILES, INSLIMVML_IDENTIFIER,
   IProps, OBJ_EXT, PackType, STEAM_ID, VBUILD_EXT } from './common';
-import { installCoreRemover, installFullPack, installInSlimModLoader, installVBuildMod,
+import { installBetterCont, installCoreRemover, installFullPack, installInSlimModLoader, installVBuildMod,
+  testBetterCont,
   testCoreRemover, testFullPack, testInSlimModLoader, testVBuild } from './installers';
 import { migrate103, migrate104 } from './migrations';
 import { hasMultipleLibMods, isDependencyRequired } from './tests';
 
 import { migrateR2ToVortex, userHasR2Installed } from './r2Vortex';
+
+const app = remote !== undefined ? remote.app : appIn;
+const WORLDS_PATH = path.resolve(app.getPath('appData'),
+  '..', 'LocalLow', 'IronGate', 'Valheim', 'worlds');
 
 const STOP_PATTERNS = ['config', 'plugins', 'patchers'];
 function toWordExp(input) {
@@ -230,24 +236,36 @@ function main(context: types.IExtensionContext) {
     });
   };
 
+  const betterContinentsTest = () => {
+    const basePath = modsPath(getGamePath());
+    const requiredAssembly = path.join(basePath, 'BetterContinents.dll');
+    return isDependencyRequired(context.api, {
+      dependentModType: 'better-continents-mod',
+      masterModType: '',
+      masterName: 'Better Continents',
+      masterURL: 'https://www.nexusmods.com/valheim/mods/446',
+      requiredFiles: [ requiredAssembly ],
+    });
+  };
+
   context.registerAction('mod-icons', 115, 'import', {}, 'Import From r2modman', () => {
     migrateR2ToVortex(context.api);
   }, () => userHasR2Installed() && getGamePath() !== '.');
 
-  context.registerTest('vbuild-dep-test', 'gamemode-activated', vbuildDepTest);
-  context.registerTest('vbuild-dep-test', 'mod-installed', vbuildDepTest);
+  const dependencyTests = [ vbuildDepTest, customMeshesTest,
+    customTexturesTest, betterContinentsTest ];
 
-  context.registerTest('textures-dep-test', 'gamemode-activated', customMeshesTest);
-  context.registerTest('textures-dep-test', 'mod-installed', customMeshesTest);
-
-  context.registerTest('meshes-dep-test', 'gamemode-activated', customTexturesTest);
-  context.registerTest('meshes-dep-test', 'mod-installed', customTexturesTest);
+  for (const testFunc of dependencyTests) {
+    context.registerTest(testFunc.toString(), 'gamemode-activated', testFunc);
+    context.registerTest(testFunc.toString(), 'mod-installed', testFunc);
+  }
 
   context.registerTest('multiple-lib-mods', 'gamemode-activated',
     () => hasMultipleLibMods(context.api));
   context.registerTest('multiple-lib-mods', 'mod-installed',
     () => hasMultipleLibMods(context.api));
 
+  context.registerInstaller('valheim-better-continents', 20, testBetterCont, installBetterCont);
   context.registerInstaller('valheim-core-remover', 20, testCoreRemover, installCoreRemover);
   context.registerInstaller('valheim-inslimvm', 20, testInSlimModLoader, installInSlimModLoader);
   context.registerInstaller('valheim-vbuild', 20, testVBuild, installVBuildMod);
@@ -328,6 +346,12 @@ function main(context: types.IExtensionContext) {
     const supported = hasInstruction(instructions, (instr) => matcher(instr.source));
     return Bluebird.Promise.Promise.resolve(supported);
     }, { name: 'BepInEx Root Mod' });
+
+  context.registerModType('better-continents-mod', 25, isSupported,
+    () => WORLDS_PATH, (instructions: types.IInstruction[]) => {
+      const hasVMLIni = findInstrMatch(instructions, BETTER_CONT_EXT, path.extname);
+      return Bluebird.Promise.Promise.resolve(hasVMLIni);
+    }, { name: 'Better Continents Mod' });
 
   context.once(() => {
     context.api.onAsync('will-deploy', async (profileId) => {

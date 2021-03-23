@@ -2,7 +2,7 @@ import Promise from 'bluebird';
 import path from 'path';
 
 import { types, util } from 'vortex-api';
-import { DOORSTOPPER_HOOK, GAME_ID, IGNORABLE_FILES,
+import { BETTER_CONT_EXT, DOORSTOPPER_HOOK, GAME_ID, IGNORABLE_FILES,
   INSLIMVML_IDENTIFIER, PackType, VBUILD_EXT } from './common';
 
 const INVALID_DIRS = ['core', 'valheim_data'];
@@ -31,6 +31,30 @@ function getPackType(seg: string): PackType {
 
 function isInvalidSegment(filePathSegment: string, invalidCollection: string[]) {
   return invalidCollection.includes(filePathSegment);
+}
+
+export function testBetterCont(files: string[], gameId: string): Promise<types.ISupportedResult> {
+  if (gameId !== GAME_ID) {
+    return Promise.resolve({ supported: false, requiredFiles: [] });
+  }
+
+  const supported = files.find(file =>
+    path.extname(file).toLowerCase() === BETTER_CONT_EXT) !== undefined;
+  return Promise.resolve({ supported, requiredFiles: [] });
+}
+
+export function installBetterCont(files: string[], destinationPath: string, gameId: string) {
+  const filtered = files.filter(path.extname);
+  const betterContFile = filtered.find(file =>
+    path.extname(file).toLowerCase() === BETTER_CONT_EXT);
+  const idx = betterContFile.split(path.sep).indexOf(path.basename(betterContFile));
+  const instructions: types.IInstruction[] = filtered.map(file => ({
+    type: 'copy',
+    source: file,
+    destination: file.split(path.sep).slice(idx).join(path.sep),
+  }));
+
+  return Promise.resolve({ instructions });
 }
 
 export function testVBuild(files: string[], gameId: string): Promise<types.ISupportedResult> {
