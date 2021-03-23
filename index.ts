@@ -256,8 +256,8 @@ function main(context: types.IExtensionContext) {
     customTexturesTest, betterContinentsTest ];
 
   for (const testFunc of dependencyTests) {
-    context.registerTest(testFunc.toString(), 'gamemode-activated', testFunc);
-    context.registerTest(testFunc.toString(), 'mod-installed', testFunc);
+    context.registerTest(testFunc.name.toString(), 'gamemode-activated', testFunc);
+    context.registerTest(testFunc.name.toString(), 'mod-installed', testFunc);
   }
 
   context.registerTest('multiple-lib-mods', 'gamemode-activated',
