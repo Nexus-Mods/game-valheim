@@ -1,13 +1,33 @@
 import Promise from 'bluebird';
 import path from 'path';
 
-import { types } from 'vortex-api';
+import { types, util } from 'vortex-api';
 import { DOORSTOPPER_HOOK, GAME_ID, IGNORABLE_FILES,
-  INSLIMVML_IDENTIFIER, VBUILD_EXT } from './common';
+  INSLIMVML_IDENTIFIER, PackType, VBUILD_EXT } from './common';
 
-// These are directories we
 const INVALID_DIRS = ['core', 'valheim_data'];
 const INVALID_FILES = [DOORSTOPPER_HOOK].concat(IGNORABLE_FILES).map(file => file.toLowerCase());
+const PACK_SEGMENTS = ['core_lib', 'unstripped_corlib'];
+
+function indexOfPackSegment(segments: string[]) {
+  const hasPackSegment = (seg: string) => PACK_SEGMENTS.includes(seg);
+  const segment = segments.find(hasPackSegment);
+  if (segment !== undefined) {
+    return segments.indexOf(segment);
+  }
+  return -1;
+}
+
+function getPackType(seg: string): PackType {
+  switch (seg) {
+    case 'core_lib':
+      return 'core_lib';
+    case 'unstripped_corlib':
+      return 'unstripped_corlib';
+    default:
+      return 'none';
+  }
+}
 
 function isInvalidSegment(filePathSegment: string, invalidCollection: string[]) {
   return invalidCollection.includes(filePathSegment);
@@ -136,12 +156,12 @@ export function testFullPack(files: string[], gameId: string): Promise<types.ISu
   let supported = false;
   for (const file of files) {
     const segments = file.split(path.sep).map(seg => seg.toLowerCase());
-    const coreLibIdx = segments.findIndex(seg => seg === 'core_lib');
+    const coreLibIdx = indexOfPackSegment(segments);
     if (coreLibIdx === -1) {
       continue;
     }
 
-    if (coreLibIdx > 1 && segments[coreLibIdx - 1] === 'bepinex') {
+    if (coreLibIdx !== undefined) {
       supported = true;
       break;
     }
@@ -151,35 +171,43 @@ export function testFullPack(files: string[], gameId: string): Promise<types.ISu
 
 export function installFullPack(files: string[], destinationPath: string, gameId: string) {
   let coreLibIdx = -1;
+  let packType: PackType;
   const filtered = files.filter(file => {
     const segments = file.split(path.sep).map(seg => seg.toLowerCase());
     if (!path.extname(segments[segments.length - 1])) {
       return false;
     }
     if (coreLibIdx === -1) {
-      const potentialMatch = segments.findIndex(seg => seg === 'core_lib');
-      if (potentialMatch > 1 && segments[potentialMatch - 1] === 'bepinex') {
-        coreLibIdx = potentialMatch;
+      coreLibIdx = indexOfPackSegment(segments);
+      packType = getPackType(segments[coreLibIdx]);
+      if (coreLibIdx !== -1) {
         return true;
       }
     } else {
-      if ((segments[coreLibIdx - 1] === 'bepinex')
-        && (segments[coreLibIdx] === 'core_lib')) {
+      if (PACK_SEGMENTS.includes(segments[coreLibIdx])) {
         return true;
       }
     }
     return false;
   });
 
-  const modTypeInstr: types.IInstruction = {
-    type: 'setmodtype',
-    value: 'bepinex-root-mod',
-  };
+  if (packType === 'none') {
+    // How did we get here if this isn't an unstripped assemblies package?
+    return Promise.reject(new util.NotSupportedError());
+  }
+  const modTypeInstr: types.IInstruction = (packType === 'core_lib')
+    ? {
+      type: 'setmodtype',
+      value: 'bepinex-root-mod',
+    } : {
+      type: 'setmodtype',
+      value: 'unstripped-assemblies',
+    };
 
   const modAttribInstr: types.IInstruction = {
     type: 'attribute',
-    key: 'IsCoreLibMod',
-    value: 'true',
+    key: 'CoreLibType',
+    value: packType,
   };
   const instructions: types.IInstruction[] = [modTypeInstr, modAttribInstr]
     .concat(filtered.map(file => ({

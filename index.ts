@@ -5,11 +5,11 @@ import Parser, { IniFile, WinapiFormat } from 'vortex-parse-ini';
 import * as payloadDeployer from './payloadDeployer';
 
 import { FBX_EXT, GAME_ID, genProps, IGNORABLE_FILES, INSLIMVML_IDENTIFIER,
-  IProps, OBJ_EXT, STEAM_ID, VBUILD_EXT } from './common';
+  IProps, OBJ_EXT, PackType, STEAM_ID, VBUILD_EXT } from './common';
 import { installCoreRemover, installFullPack, installInSlimModLoader, installVBuildMod,
   testCoreRemover, testFullPack, testInSlimModLoader, testVBuild } from './installers';
-import { migrate103 } from './migrations';
-import { isDependencyRequired } from './tests';
+import { migrate103, migrate104 } from './migrations';
+import { hasMultipleLibMods, isDependencyRequired } from './tests';
 
 import { migrateR2ToVortex, userHasR2Installed } from './r2Vortex';
 
@@ -43,8 +43,10 @@ async function ensureUnstrippedAssemblies(props: IProps): Promise<void> {
   const t = api.translate;
   const expectedFilePath = path.join(props.discovery.path,
     'unstripped_managed', 'mono.security.dll');
-  const fullPackCorLib = path.join(props.discovery.path,
+  const fullPackCorLibOld = path.join(props.discovery.path,
     'BepInEx', 'core_lib', 'mono.security.dll');
+  const fullPackCorLibNew = path.join(props.discovery.path,
+    'unstripped_corlib', 'mono.security.dll');
 
   const raiseMissingAssembliesDialog = () => new Promise<void>((resolve, reject) => {
     api.showDialog('info', 'Missing unstripped assemblies', {
@@ -80,17 +82,32 @@ async function ensureUnstrippedAssemblies(props: IProps): Promise<void> {
 
   const mods: { [modId: string]: types.IMod } =
     util.getSafe(props.state, ['persistent', 'mods', GAME_ID], {});
-  const coreLibModId = Object.keys(mods).find(key =>
-    util.getSafe(mods[key], ['attributes', 'IsCoreLibMod'], false));
-  if (coreLibModId !== undefined) {
-    const isCoreLibModEnabled = util.getSafe(props.profile,
-      ['modState', coreLibModId, 'enabled'], false);
-    if (isCoreLibModEnabled) {
-      assignOverridePath('BepInEx\\core_lib');
-      return;
+  const coreLibModIds = Object.keys(mods).filter(key => {
+    const hasCoreLibType = util.getSafe(mods[key],
+      ['attributes', 'CoreLibType'], undefined) !== undefined;
+    const isEnabled = util.getSafe(props.profile,
+      ['modState', key, 'enabled'], false);
+    return hasCoreLibType && isEnabled;
+  });
+
+  if (coreLibModIds.length > 0) {
+    // We don't care if the user has several installed, select the first one.
+    const coreLibModId = coreLibModIds[0];
+
+    const packType: PackType = mods[coreLibModId].attributes['CoreLibType'];
+    switch (packType) {
+      case 'core_lib':
+        assignOverridePath('BepInEx\\core_lib');
+        return;
+      case 'unstripped_corlib':
+        assignOverridePath('unstripped_corlib');
+        return;
+      default:
+        // nop - let the for loop below try to find the pack.
     }
   }
-  for (const filePath of [fullPackCorLib, expectedFilePath]) {
+
+  for (const filePath of [fullPackCorLibNew, fullPackCorLibOld, expectedFilePath]) {
     try {
       await fs.statAsync(filePath);
       const dllOverridePath = filePath.replace(props.discovery.path + path.sep, '')
@@ -226,12 +243,18 @@ function main(context: types.IExtensionContext) {
   context.registerTest('meshes-dep-test', 'gamemode-activated', customTexturesTest);
   context.registerTest('meshes-dep-test', 'mod-installed', customTexturesTest);
 
+  context.registerTest('multiple-lib-mods', 'gamemode-activated',
+    () => hasMultipleLibMods(context.api));
+  context.registerTest('multiple-lib-mods', 'mod-installed',
+    () => hasMultipleLibMods(context.api));
+
   context.registerInstaller('valheim-core-remover', 20, testCoreRemover, installCoreRemover);
   context.registerInstaller('valheim-inslimvm', 20, testInSlimModLoader, installInSlimModLoader);
   context.registerInstaller('valheim-vbuild', 20, testVBuild, installVBuildMod);
   context.registerInstaller('valheim-full-bep-pack', 10, testFullPack, installFullPack);
 
   context.registerMigration((oldVersion: string) => migrate103(context.api, oldVersion));
+  context.registerMigration((oldVersion: string) => migrate104(context.api, oldVersion));
 
   context.registerModType('inslimvml-mod-loader', 20, isSupported, getGamePath,
     (instructions: types.IInstruction[]) => {

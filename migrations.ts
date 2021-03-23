@@ -1,6 +1,26 @@
 import Promise from 'bluebird';
 import semver from 'semver';
-import { types } from 'vortex-api';
+import { actions, types, util } from 'vortex-api';
+
+import { GAME_ID } from './common';
+
+export function migrate104(api: types.IExtensionApi, oldVersion: string) {
+  if (semver.gte(oldVersion, '1.0.4')) {
+    return Promise.resolve();
+  }
+
+  const state = api.getState();
+  const mods: { [modId: string]: types.IMod } =
+    util.getSafe(state, ['persistent', 'mods', GAME_ID], {});
+  const coreLibModId = Object.keys(mods).find(key =>
+    util.getSafe(mods[key], ['attributes', 'IsCoreLibMod'], false));
+
+  if (coreLibModId !== undefined) {
+    api.store.dispatch(actions.setModAttribute(GAME_ID, coreLibModId, 'CoreLibType', 'core_lib'));
+  }
+
+  return Promise.resolve();
+}
 
 export function migrate103(api: types.IExtensionApi, oldVersion: string) {
   if (semver.gte(oldVersion, '1.0.3')) {

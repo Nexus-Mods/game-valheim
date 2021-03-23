@@ -1,6 +1,7 @@
 import turbowalk, { IEntry } from 'turbowalk';
 import { log, selectors, types, util } from 'vortex-api';
 
+export declare type PackType = 'none' | 'core_lib' | 'unstripped_corlib';
 export const GAME_ID = 'valheim';
 export const STEAM_ID = '892970';
 

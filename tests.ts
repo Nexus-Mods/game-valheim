@@ -22,6 +22,41 @@ export interface IDependencyTest {
 }
 
 // tslint:disable-next-line: max-line-length
+export function hasMultipleLibMods(api: types.IExtensionApi): Promise<types.ITestResult> {
+  const state = api.getState();
+  const profile: types.IProfile = selectors.activeProfile(state);
+  if (profile?.gameId !== GAME_ID) {
+    return Promise.resolve(undefined);
+  }
+
+  const mods: { [modId: string]: types.IMod } =
+    util.getSafe(state, ['persistent', 'mods', GAME_ID], {});
+
+  const modNames = Object.keys(mods)
+    .filter(id => {
+      const isPackMod = util.getSafe(mods[id],
+        ['attributes', 'CoreLibType'], undefined) !== undefined;
+      const isEnabled = util.getSafe(profile, ['modState', id, 'enabled'], false);
+      return isPackMod && isEnabled;
+    })
+    .map(id => util.renderModName(mods[id]));
+
+  return (modNames.length > 1)
+    ? Promise.resolve({
+      description: {
+        short: 'Multiple unstripped assembly mods detected',
+        long: 'You currently have several mods installed and enabled which aim to provide '
+            + 'replacements for Valheim\'s optimized assemblies - Vortex is currently configuring '
+            + 'the Unity doorstop hook to use "{{primaryMod}}" - if this is incorrect, please disable '
+            + '"{{primaryMod}}" and re-deploy your mods.\n\n',
+        replace: { primaryMod: modNames[0] },
+      },
+      severity: 'warning',
+    })
+    : Promise.resolve(undefined);
+}
+
+// tslint:disable-next-line: max-line-length
 export function isDependencyRequired(api: types.IExtensionApi, dependencyTest: IDependencyTest): Promise<types.ITestResult> {
   const state = api.getState();
   const profile: types.IProfile = selectors.activeProfile(state);
