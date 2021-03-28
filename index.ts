@@ -250,7 +250,13 @@ function main(context: types.IExtensionContext) {
 
   context.registerAction('mod-icons', 115, 'import', {}, 'Import From r2modman', () => {
     migrateR2ToVortex(context.api);
-  }, () => userHasR2Installed() && getGamePath() !== '.');
+  }, () => {
+    const state = context.api.getState();
+    const activeGameId = selectors.activeGameId(state);
+    return userHasR2Installed()
+      && (getGamePath() !== '.')
+      && (activeGameId === GAME_ID);
+  });
 
   const dependencyTests = [ vbuildDepTest, customMeshesTest,
     customTexturesTest ];
