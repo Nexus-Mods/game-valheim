@@ -125,6 +125,16 @@ async function ensureUnstrippedAssemblies(props: IProps): Promise<void> {
     }
   }
 
+  // We may not have the unstripped files deployed, but the mod might actually be
+  //  installed and enabled (so it will be deployed on the next deployment event)
+  const unstrippedMod = Object.keys(mods).filter(id => mods[id]?.type === 'unstripped-assemblies');
+  if (unstrippedMod.length > 0) {
+    if (util.getSafe(props.profile, ['modState', unstrippedMod[0], 'enabled'], false)) {
+      // The Nexus Mods unstripped assmeblies mod is enabled - don't raise the missing
+      //  assemblies dialog.
+      return;
+    }
+  }
   return raiseMissingAssembliesDialog();
 }
 
