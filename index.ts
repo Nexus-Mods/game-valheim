@@ -184,8 +184,8 @@ function main(context: types.IExtensionContext) {
     details: {
       steamAppId: +STEAM_ID,
       stopPatterns: STOP_PATTERNS.map(toWordExp),
-      ignoreConflicts: IGNORABLE_FILES,
-      ignoreDeploy: IGNORABLE_FILES,
+      ignoreConflicts: [].concat(IGNORABLE_FILES, IGNORABLE_FILES.map(file => file.toLowerCase())),
+      ignoreDeploy: [].concat(IGNORABLE_FILES, IGNORABLE_FILES.map(file => file.toLowerCase())),
     },
   });
 
