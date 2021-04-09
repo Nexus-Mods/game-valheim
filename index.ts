@@ -5,11 +5,12 @@ import { fs, log, selectors, types, util } from 'vortex-api';
 import Parser, { IniFile, WinapiFormat } from 'vortex-parse-ini';
 import * as payloadDeployer from './payloadDeployer';
 
-import { BETTER_CONT_EXT, FBX_EXT, GAME_ID, genProps, IGNORABLE_FILES, INSLIMVML_IDENTIFIER,
-  IProps, OBJ_EXT, PackType, STEAM_ID, VBUILD_EXT } from './common';
-import { installBetterCont, installCoreRemover, installFullPack, installInSlimModLoader, installVBuildMod,
-  testBetterCont,
-  testCoreRemover, testFullPack, testInSlimModLoader, testVBuild } from './installers';
+import { BETTER_CONT_EXT, FBX_EXT, GAME_ID, GAME_ID_SERVER,
+  genProps, IGNORABLE_FILES, INSLIMVML_IDENTIFIER,
+  IProps, ISCMDProps, OBJ_EXT, PackType, STEAM_ID, VBUILD_EXT } from './common';
+import { installBetterCont, installCoreRemover, installFullPack, installInSlimModLoader,
+  installVBuildMod, testBetterCont, testCoreRemover, testFullPack, testInSlimModLoader,
+  testVBuild } from './installers';
 import { migrate103, migrate104 } from './migrations';
 import { hasMultipleLibMods, isDependencyRequired } from './tests';
 
@@ -17,7 +18,7 @@ import { migrateR2ToVortex, userHasR2Installed } from './r2Vortex';
 
 const app = remote !== undefined ? remote.app : appIn;
 const WORLDS_PATH = path.resolve(app.getPath('appData'),
-  '..', 'LocalLow', 'IronGate', 'Valheim', 'worlds');
+  '..', 'LocalLow', 'IronGate', 'Valheim', 'vortex-worlds');
 
 const STOP_PATTERNS = ['config', 'plugins', 'patchers'];
 function toWordExp(input) {
@@ -188,6 +189,31 @@ function main(context: types.IExtensionContext) {
     },
   });
 
+  // context.registerGame({
+  //   id: GAME_ID_SERVER,
+  //   name: 'Valheim: Dedicated Server',
+  //   mergeMods: true,
+  //   queryPath: () => undefined,
+  //   queryModPath: modsPath,
+  //   logo: 'gameart.jpg',
+  //   executable: () => 'start_headless_server.bat',
+  //   requiresLauncher,
+  //   setup: discovery => prepareForModding(context, discovery),
+  //   requiredFiles: [
+  //     'start_headless_server.bat',
+  //   ],
+  //   environment: {
+  //     SteamAPPId: STEAM_ID,
+  //   },
+  //   details: {
+  //     nexusPageId: GAME_ID,
+  //     steamAppId: +STEAM_ID,
+  //     stopPatterns: STOP_PATTERNS.map(toWordExp),
+  //     ignoreConflicts: IGNORABLE_FILES,
+  //     ignoreDeploy: IGNORABLE_FILES,
+  //   },
+  // });
+
   const getGamePath = () => {
     const props: IProps = genProps(context);
     return (props?.discovery?.path !== undefined)
@@ -258,6 +284,25 @@ function main(context: types.IExtensionContext) {
     });
   };
 
+  // context.registerAction('mod-icons', 100, 'steamcmd', {}, 'SteamCMD Dedicated Server', () => {
+  //   context.api.selectDir({})
+  //     .then((selectedPath: string) => {
+  //       if (selectedPath) {
+  //         const props: ISCMDProps = {
+  //           gameId: GAME_ID_SERVER,
+  //           steamAppId: +STEAM_ID,
+  //           arguments: [
+  //             { argument: 'force_install_dir', value: selectedPath },
+  //             { argument: 'quit' },
+  //           ],
+  //           callback: ((err, data) => null),
+  //         };
+  //         context.api.ext.scmdStartDedicatedServer(props);
+  //       }
+  //     })
+  //     .catch(err => null);
+  // }, () => context.api.ext?.scmdStartDedicatedServer !== undefined);
+
   context.registerAction('mod-icons', 115, 'import', {}, 'Import From r2modman', () => {
     migrateR2ToVortex(context.api);
   }, () => {
@@ -269,7 +314,7 @@ function main(context: types.IExtensionContext) {
   });
 
   const dependencyTests = [ vbuildDepTest, customMeshesTest,
-    customTexturesTest ];
+    customTexturesTest, betterContinentsTest ];
 
   for (const testFunc of dependencyTests) {
     context.registerTest(testFunc.name.toString(), 'gamemode-activated', testFunc);
@@ -281,7 +326,7 @@ function main(context: types.IExtensionContext) {
   context.registerTest('multiple-lib-mods', 'mod-installed',
     () => hasMultipleLibMods(context.api));
 
-  // context.registerInstaller('valheim-better-continents', 20, testBetterCont, installBetterCont);
+  context.registerInstaller('valheim-better-continents', 20, testBetterCont, installBetterCont);
   context.registerInstaller('valheim-core-remover', 20, testCoreRemover, installCoreRemover);
   context.registerInstaller('valheim-inslimvm', 20, testInSlimModLoader, installInSlimModLoader);
   context.registerInstaller('valheim-vbuild', 20, testVBuild, installVBuildMod);
@@ -363,11 +408,11 @@ function main(context: types.IExtensionContext) {
     return Bluebird.Promise.Promise.resolve(supported);
     }, { name: 'BepInEx Root Mod' });
 
-  // context.registerModType('better-continents-mod', 25, isSupported,
-  //   () => WORLDS_PATH, (instructions: types.IInstruction[]) => {
-  //     const hasVMLIni = findInstrMatch(instructions, BETTER_CONT_EXT, path.extname);
-  //     return Bluebird.Promise.Promise.resolve(hasVMLIni);
-  //   }, { name: 'Better Continents Mod' });
+  context.registerModType('better-continents-mod', 25, isSupported,
+    () => WORLDS_PATH, (instructions: types.IInstruction[]) => {
+      const hasBCExt = findInstrMatch(instructions, BETTER_CONT_EXT, path.extname);
+      return Bluebird.Promise.Promise.resolve(hasBCExt);
+    }, { name: 'Better Continents Mod' });
 
   context.once(() => {
     context.api.onAsync('will-deploy', async (profileId) => {
@@ -385,53 +430,6 @@ function main(context: types.IExtensionContext) {
 
     context.api.onAsync('did-purge', async (profileId) =>
       payloadDeployer.onDidPurge(context, profileId));
-
-    // context.api.onAsync('added-files', async (profileId, files) => {
-    //   const props: IProps = genProps(context, profileId);
-    //   if (props === undefined) {
-    //     return;
-    //   }
-    //   const state = props.state;
-    //   const game = util.getGame(GAME_ID);
-    //   const discovery = props.discovery;
-    //   const modPaths = game.getModPaths(discovery.path);
-    //   const installPath = selectors.installPathForGame(state, GAME_ID);
-    //   const manifest: types.IDeploymentManifest = await util.getManifest(context.api, 'better-continents-mod', GAME_ID);
-    //   const addFileToMod = async (entry, modId) => {
-    //     const mod: types.IMod = util.getSafe(state.persistent.mods, [GAME_ID, modId], undefined);
-    //       if (mod?.type !== 'better-continents-mod') {
-    //         // We only want to pickup the .old files generated by the game
-    //         //  as part of its "worlds" sync which is why we only care for
-    //         //  'better-continents-mod' modtype.
-    //         return;
-    //       }
-
-    //       const relPath = path.relative(modPaths[mod.type], entry.filePath);
-    //       const targetPath = path.join(installPath, mod.id, relPath);
-    //       // copy the new file back into the corresponding mod, then delete it. That way, vortex will
-    //       // create a link to it with the correct deployment method and not ask the user any questions
-    //       await fs.ensureDirAsync(path.dirname(targetPath));
-    //       try {
-    //         await fs.copyAsync(entry.filePath, targetPath);
-    //         await fs.removeAsync(entry.filePath);
-    //       } catch (err) {
-    //         log('error', 'failed to persist newly added file', err);
-    //         return;
-    //       }
-    //   }
-    //   for (const entry of files) {
-    //     if (entry.candidates?.length === 1) {
-    //       await addFileToMod(entry, entry.candidates[0]);
-    //       continue;
-    //     } else {
-    //       const candidate = manifest.files.find(manFile => path.basename(manFile.relPath) === path.basename(entry.filePath, '.old'))?.source;
-    //       if (candidate !== undefined) {
-    //         await addFileToMod(entry, candidate);
-    //         continue;
-    //       }
-    //     }
-    //   }
-    // });
   });
 
   return true;

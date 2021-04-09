@@ -3,6 +3,9 @@ import { log, selectors, types, util } from 'vortex-api';
 
 export declare type PackType = 'none' | 'core_lib' | 'unstripped_corlib';
 export const GAME_ID = 'valheim';
+export const GAME_ID_SERVER = 'valheimserver';
+export const isValheimGame = (gameId: string) => [GAME_ID_SERVER, GAME_ID].includes(gameId);
+
 export const STEAM_ID = '892970';
 
 export const BETTER_CONT_EXT = '.bettercontinents';
@@ -32,6 +35,18 @@ export interface IProps {
   state: types.IState;
   profile: types.IProfile;
   discovery: types.IDiscoveryResult;
+}
+
+export interface IArgument {
+  argument: string;
+  value?: string;
+}
+
+export interface ISCMDProps {
+  gameId: string;
+  steamAppId: number;
+  callback?: (err: Error, data: any) => void;
+  arguments: IArgument[];
 }
 
 export async function walkDirPath(dirPath: string): Promise<IEntry[]> {
