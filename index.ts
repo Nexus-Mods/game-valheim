@@ -11,14 +11,12 @@ import { BETTER_CONT_EXT, FBX_EXT, GAME_ID, GAME_ID_SERVER,
 import { installBetterCont, installCoreRemover, installFullPack, installInSlimModLoader,
   installVBuildMod, testBetterCont, testCoreRemover, testFullPack, testInSlimModLoader,
   testVBuild } from './installers';
-import { migrate103, migrate104 } from './migrations';
+import { migrate103, migrate104, migrate106 } from './migrations';
 import { hasMultipleLibMods, isDependencyRequired } from './tests';
 
 import { migrateR2ToVortex, userHasR2Installed } from './r2Vortex';
 
 const app = remote !== undefined ? remote.app : appIn;
-const WORLDS_PATH = path.resolve(app.getPath('appData'),
-  '..', 'LocalLow', 'IronGate', 'Valheim', 'vortex-worlds');
 
 const STOP_PATTERNS = ['config', 'plugins', 'patchers'];
 function toWordExp(input) {
@@ -334,6 +332,7 @@ function main(context: types.IExtensionContext) {
 
   context.registerMigration((oldVersion: string) => migrate103(context.api, oldVersion));
   context.registerMigration((oldVersion: string) => migrate104(context.api, oldVersion));
+  context.registerMigration((oldVersion: string) => migrate106(context.api, oldVersion));
 
   context.registerModType('inslimvml-mod-loader', 20, isSupported, getGamePath,
     (instructions: types.IInstruction[]) => {
@@ -409,7 +408,8 @@ function main(context: types.IExtensionContext) {
     }, { name: 'BepInEx Root Mod' });
 
   context.registerModType('better-continents-mod', 25, isSupported,
-    () => WORLDS_PATH, (instructions: types.IInstruction[]) => {
+    () => path.join(getGamePath(), 'vortex-worlds'),
+    (instructions: types.IInstruction[]) => {
       const hasBCExt = findInstrMatch(instructions, BETTER_CONT_EXT, path.extname);
       return Bluebird.Promise.Promise.resolve(hasBCExt);
     }, { name: 'Better Continents Mod' });

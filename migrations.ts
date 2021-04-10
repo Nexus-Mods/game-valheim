@@ -1,8 +1,33 @@
 import Promise from 'bluebird';
+import { app as appIn, remote } from 'electron';
+import path from 'path';
 import semver from 'semver';
-import { actions, types, util } from 'vortex-api';
+import { actions, fs, types, util } from 'vortex-api';
 
 import { GAME_ID } from './common';
+
+const appuni = appIn || remote.app;
+const WORLDS_PATH = path.resolve(appuni.getPath('appData'),
+  '..', 'LocalLow', 'IronGate', 'Valheim', 'vortex-worlds');
+
+export function migrate106(api: types.IExtensionApi, oldVersion: string) {
+  if (semver.gte(oldVersion, '1.0.6')) {
+    return Promise.resolve();
+  }
+
+  const state = api.getState();
+  const mods: { [modId: string]: types.IMod } =
+    util.getSafe(state, ['persistent', 'mods', GAME_ID], {});
+  const worldMods = Object.keys(mods).filter(key => mods[key]?.type === 'better-continents-mod');
+  if (worldMods.length > 0) {
+    return api.awaitUI()
+      .then(() => fs.ensureDirWritableAsync(WORLDS_PATH))
+      // tslint:disable-next-line: max-line-length
+      .then(() => api.emitAndAwait('purge-mods-in-path', GAME_ID, 'better-continents-mod', WORLDS_PATH));
+  }
+
+  return Promise.resolve();
+}
 
 export function migrate104(api: types.IExtensionApi, oldVersion: string) {
   if (semver.gte(oldVersion, '1.0.4')) {
