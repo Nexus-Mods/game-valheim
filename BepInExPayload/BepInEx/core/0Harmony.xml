@@ -164,14 +164,15 @@
              <summary>Sorts patch methods by their priority rules</summary>
              <param name="original">The original method</param>
              <param name="patches">Patches to sort</param>
-             <param name="debug">Use debug mode. Present for source parity with Harmony 2, don't use.</param>
+             <param name="debug">Use debug mode</param>
              <returns>The sorted patch methods</returns>
             
         </member>
-        <member name="M:HarmonyLib.PatchFunctions.GetSortedPatchMethodsAsPatches(System.Reflection.MethodBase,HarmonyLib.Patch[])">
+        <member name="M:HarmonyLib.PatchFunctions.GetSortedPatchMethodsAsPatches(System.Reflection.MethodBase,HarmonyLib.Patch[],System.Boolean)">
              <summary>Sorts patch methods by their priority rules</summary>
              <param name="original">The original method</param>
              <param name="patches">Patches to sort</param>
+             <param name="debug">Use debug mode</param>
              <returns>The sorted patch methods</returns>
             
         </member>
@@ -187,11 +188,12 @@
                High-level IL code manipulator for MonoMod that allows to manipulate a method as a stream of CodeInstructions.
             </summary>
         </member>
-        <member name="M:HarmonyLib.Internal.Patching.ILManipulator.#ctor(Mono.Cecil.Cil.MethodBody)">
+        <member name="M:HarmonyLib.Internal.Patching.ILManipulator.#ctor(Mono.Cecil.Cil.MethodBody,System.Boolean)">
             <summary>
                Initialize IL transpiler
             </summary>
             <param name="body">Body of the method to transpile</param>
+            <param name="debug">Whether to always log everything for this instance</param>
         </member>
         <member name="M:HarmonyLib.Internal.Patching.ILManipulator.AddTranspiler(System.Reflection.MethodInfo)">
             <summary>
@@ -1960,9 +1962,9 @@
             
         </member>
         <member name="M:HarmonyLib.PatchProcessor.AddILManipulator(HarmonyLib.HarmonyMethod)">
-            <summary>Adds an ilmanipulator</summary>
-            <param name="ilmanipulator">The ilmanipulator as a <see cref="T:HarmonyLib.HarmonyMethod"/></param>
-            <returns>A <see cref="T:HarmonyLib.PatchProcessor"/> for chaining calls</returns>
+             <summary>Adds an ilmanipulator</summary>
+             <param name="ilmanipulator">The ilmanipulator as a <see cref="T:HarmonyLib.HarmonyMethod"/></param>
+             <returns>A <see cref="T:HarmonyLib.PatchProcessor"/> for chaining calls</returns>
             
         </member>
         <member name="M:HarmonyLib.PatchProcessor.AddILManipulator(System.Reflection.MethodInfo)">
@@ -2179,6 +2181,10 @@
              <summary>Shortcut for <see cref="T:System.Reflection.BindingFlags"/> to simplify the use of reflections and make it work for any access level but only within the current type</summary>
             
         </member>
+        <member name="M:HarmonyLib.AccessTools.AllAssemblies">
+            <summary>Enumerates all assemblies in the current app domain, excluding visual studio assemblies</summary>
+            <returns>An enumeration of <see cref="T:System.Reflection.Assembly"/></returns>
+        </member>
         <member name="M:HarmonyLib.AccessTools.TypeByName(System.String)">
              <summary>Gets a type by name. Prefers a full name with namespace but falls back to the first type matching the name otherwise</summary>
              <param name="name">The name</param>
@@ -2195,6 +2201,10 @@
              filtered for non-null values).
              </remarks>
             
+        </member>
+        <member name="M:HarmonyLib.AccessTools.AllTypes">
+            <summary>Enumerates all successfully loaded types in the current app domain, excluding visual studio assemblies</summary>
+            <returns>An enumeration of all <see cref="T:System.Type"/> in all assemblies, excluding visual studio assemblies</returns>
         </member>
         <member name="M:HarmonyLib.AccessTools.FindIncludingBaseTypes``1(System.Type,System.Func{System.Type,``0})">
              <summary>Applies a function going up the type hierarchy and stops at the first non-<c>null</c> result</summary>
