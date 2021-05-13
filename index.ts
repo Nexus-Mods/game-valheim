@@ -197,7 +197,7 @@ async function ensureUnstrippedAssemblies(props: IProps): Promise<void> {
         const dlid = mods[modId].archiveId;
         const download: types.IDownload = util.getSafe(api.getState(),
           ['persistent', 'downloads', 'files', dlid], undefined);
-        if (download.localPath !== undefined && guessModId(download.localPath) !== '15') {
+        if (download?.localPath !== undefined && guessModId(download.localPath) !== '15') {
           // The Nexus Mods unstripped assmeblies mod is enabled - don't raise the missing
           //  assemblies dialog.
           const dllOverridePath = expectedFilePath.replace(props.discovery.path + path.sep, '')
