@@ -17,6 +17,8 @@ export const DOORSTOPPER_HOOK = 'winhttp.dll';
 export const BIX_SVML = 'slimvml.loader.dll';
 export const ISVML_SKIP = [BIX_SVML, 'slimassist.dll', '0harmony.dll'];
 
+export const NEXUS = 'www.nexusmods.com';
+
 // These are files which are crucial to Valheim's modding pattern and it appears
 //  that many mods on Vortex are currently distributing these as part of their mod.
 //  Needless to say, we don't want these deployed or reporting any conflicts as
@@ -104,4 +106,13 @@ export function genInstructions(srcPath: string,
       });
       return accum;
     }, []);
+}
+
+export function guessModId(fileName: string): string {
+  const match = fileName.match(/-([0-9]+)-/);
+  if (match !== null) {
+    return match[1];
+  } else {
+    return undefined;
+  }
 }

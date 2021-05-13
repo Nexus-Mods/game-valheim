@@ -1,17 +1,21 @@
 import Bluebird from 'bluebird';
 import { app as appIn, remote } from 'electron';
 import * as path from 'path';
-import { fs, log, selectors, types, util } from 'vortex-api';
+import { actions, fs, log, selectors, types, util } from 'vortex-api';
 import Parser, { IniFile, WinapiFormat } from 'vortex-parse-ini';
 import * as payloadDeployer from './payloadDeployer';
 
-import { BETTER_CONT_EXT, FBX_EXT, GAME_ID, GAME_ID_SERVER,
-  genProps, IGNORABLE_FILES, INSLIMVML_IDENTIFIER,
-  IProps, ISCMDProps, OBJ_EXT, PackType, STEAM_ID, VBUILD_EXT } from './common';
+import { UnstrippedAssemblyDownloader } from './unstrippedAssembly';
+
+import {
+  BETTER_CONT_EXT, FBX_EXT, GAME_ID, GAME_ID_SERVER,
+  genProps, guessModId, IGNORABLE_FILES, INSLIMVML_IDENTIFIER,
+  IProps, ISCMDProps, NEXUS, OBJ_EXT, PackType, STEAM_ID, VBUILD_EXT,
+} from './common';
 import { installBetterCont, installCoreRemover, installFullPack, installInSlimModLoader,
   installVBuildMod, testBetterCont, testCoreRemover, testFullPack, testInSlimModLoader,
   testVBuild } from './installers';
-import { migrate103, migrate104, migrate106 } from './migrations';
+import { migrate103, migrate104, migrate106, migrate109 } from './migrations';
 import { hasMultipleLibMods, isDependencyRequired } from './tests';
 
 import { migrateR2ToVortex, userHasR2Installed } from './r2Vortex';
@@ -53,6 +57,7 @@ async function ensureUnstrippedAssemblies(props: IProps): Promise<void> {
   const fullPackCorLibNew = path.join(props.discovery.path,
     'unstripped_corlib', 'mono.security.dll');
 
+  const url = path.join(NEXUS, 'valheim', 'mods', '1202') + `?tab=files&file_id=4899&nmm=1`;
   const raiseMissingAssembliesDialog = () => new Promise<void>((resolve, reject) => {
     api.showDialog('info', 'Missing unstripped assemblies', {
       bbcode: t('Valheim\'s assemblies are distributed in an "optimised" state to reduce required '
@@ -66,7 +71,7 @@ async function ensureUnstrippedAssemblies(props: IProps): Promise<void> {
       { label: 'Cancel', action: () => reject(new util.UserCanceled()) },
       {
         label: 'Download Unstripped Assemblies',
-        action: () => util.opn('https://www.nexusmods.com/valheim/mods/15')
+        action: () => util.opn(url)
           .catch(err => null)
           .finally(() => resolve()),
       },
@@ -112,7 +117,7 @@ async function ensureUnstrippedAssemblies(props: IProps): Promise<void> {
     }
   }
 
-  for (const filePath of [fullPackCorLibNew, fullPackCorLibOld, expectedFilePath]) {
+  for (const filePath of [fullPackCorLibNew, fullPackCorLibOld]) {
     try {
       await fs.statAsync(filePath);
       const dllOverridePath = filePath.replace(props.discovery.path + path.sep, '')
@@ -124,17 +129,67 @@ async function ensureUnstrippedAssemblies(props: IProps): Promise<void> {
     }
   }
 
-  // We may not have the unstripped files deployed, but the mod might actually be
-  //  installed and enabled (so it will be deployed on the next deployment event)
-  const unstrippedMod = Object.keys(mods).filter(id => mods[id]?.type === 'unstripped-assemblies');
-  if (unstrippedMod.length > 0) {
-    if (util.getSafe(props.profile, ['modState', unstrippedMod[0], 'enabled'], false)) {
-      // The Nexus Mods unstripped assmeblies mod is enabled - don't raise the missing
-      //  assemblies dialog.
-      return;
+  // Check if we have a valid variant of the unstripped assembly mods found on Nexus.
+  const unstrippedMods = Object.keys(mods).filter(id => mods[id]?.type === 'unstripped-assemblies');
+  if (unstrippedMods.length > 0) {
+    for (const modId of unstrippedMods) {
+      if (util.getSafe(props.profile, ['modState', modId, 'enabled'], false)) {
+        const dlid = mods[modId].archiveId;
+        const download: types.IDownload = util.getSafe(api.getState(),
+          ['persistent', 'downloads', 'files', dlid], undefined);
+        if (download.localPath !== undefined && guessModId(download.localPath) !== '15') {
+          // The Nexus Mods unstripped assmeblies mod is enabled - don't raise the missing
+          //  assemblies dialog.
+          const dllOverridePath = expectedFilePath.replace(props.discovery.path + path.sep, '')
+                                            .replace(path.sep + 'mono.security.dll', '');
+          await assignOverridePath(dllOverridePath);
+          return;
+        }
+      }
     }
   }
-  return raiseMissingAssembliesDialog();
+
+  const downloader = new UnstrippedAssemblyDownloader(util.getVortexPath('temp'));
+
+  try {
+    const archiveFilePath = await downloader.downloadNewest('full_name', 'denikson-BepInExPack_Valheim');
+    // Give it a second for the download to register in the state.
+    await new Promise((resolve, reject) =>
+      api.events.emit('import-downloads', [ archiveFilePath ], async (dlIds: string[]) => {
+      if (dlIds.length === 0) {
+        return reject(new util.ProcessCanceled('Failed to import archive'));
+      }
+
+      for (const dlId of dlIds) {
+        await new Promise((res2, rej2) =>
+          api.events.emit('start-install-download', dlId, true, (err, modId) => {
+          if (err) {
+            return rej2(err);
+          }
+          api.store.dispatch(actions.setModEnabled(props.profile.id, modId, true));
+          return res2(undefined);
+        }));
+      }
+
+      api.store.dispatch(actions.setDeploymentNecessary(GAME_ID, true));
+      await assignOverridePath('unstripped_corlib');
+      return resolve(undefined);
+    }));
+  } catch (err) {
+    return raiseMissingAssembliesDialog();
+    // api.showDialog('error', 'Missing Unstripped Assemblies', {
+    //   text: 'Vortex was unable to automatically download the required unstripped assemblies. '
+    //       + 'These must be downloaded and manually installed through Vortex by drag-and-dropping the '
+    //       + 'downloaded archive inside Vortex\'s mods page. Mods will not function correctly without this package.',
+    // }, [
+    //   { label: 'Close' },
+    //   {
+    //     label: 'Download BepInEx Pack',
+    //     action: () => util.opn('https://valheim.thunderstore.io/package/denikson/BepInExPack_Valheim/').catch(() => null),
+    //     default: true,
+    //   },
+    // ]);
+  }
 }
 
 function prepareForModding(context: types.IExtensionContext, discovery: types.IDiscoveryResult) {
@@ -333,6 +388,7 @@ function main(context: types.IExtensionContext) {
   context.registerMigration((oldVersion: string) => migrate103(context.api, oldVersion));
   context.registerMigration((oldVersion: string) => migrate104(context.api, oldVersion));
   context.registerMigration((oldVersion: string) => migrate106(context.api, oldVersion));
+  context.registerMigration((oldVersion: string) => migrate109(context.api, oldVersion));
 
   context.registerModType('inslimvml-mod-loader', 20, isSupported, getGamePath,
     (instructions: types.IInstruction[]) => {
