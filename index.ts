@@ -78,6 +78,32 @@ async function ensureUnstrippedAssemblies(props: IProps): Promise<void> {
     ]);
   });
 
+  const raiseForceDownloadNotif = () => api.sendNotification({
+    message: t('Game updated - Updated assemblies pack required.'),
+    type: 'info',
+    id: 'forceDownloadNotif',
+    noDismiss: true,
+    allowSuppress: true,
+    actions: [
+      {
+        title: 'More',
+        action: (dismiss) => api.showDialog('info', 'Download unstripped assemblies', {
+          bbcode: t('Valheim has been updated and to be able to mod the game you will need to ensure you are using the latest unstripped Unity assemblies or the latest "BepInEx pack". '
+                  + 'Vortex has detected that you have previously installed unstripped Unity assemblies / a BepInEx pack, but cannot know for sure whether these files are up to date. '
+                  + 'If you are unsure, Vortex can download and install the latest required files for you.{{lb}}'
+                  + 'Please note that all mods must also be updated in order for them to function with the new game version.',
+                  { replace: { lb: '[br][/br][br][/br]', br: '[br][/br]' } }),
+        }, [
+          { label: 'Close' },
+          {
+            label: 'Download Unstripped Assemblies',
+            action: () => runDownloader().finally(() => dismiss()),
+          },
+        ]),
+      },
+    ],
+  });
+
   const assignOverridePath = async (overridePath: string) => {
     const doorStopConfig = path.join(props.discovery.path, 'doorstop_config.ini');
     const parser = new Parser(new WinapiFormat());
@@ -87,6 +113,37 @@ async function ensureUnstrippedAssemblies(props: IProps): Promise<void> {
       await parser.write(doorStopConfig, iniData);
     } catch (err) {
       api.showErrorNotification('failed to modify doorstop configuration', err);
+    }
+  };
+
+  const runDownloader = async () => {
+    const downloader = new UnstrippedAssemblyDownloader(util.getVortexPath('temp'));
+    try {
+      const archiveFilePath = await downloader.downloadNewest('full_name', 'denikson-BepInExPack_Valheim');
+      // Give it a second for the download to register in the state.
+      await new Promise((resolve, reject) =>
+        api.events.emit('import-downloads', [ archiveFilePath ], async (dlIds: string[]) => {
+        if (dlIds.length === 0) {
+          return reject(new util.ProcessCanceled('Failed to import archive'));
+        }
+
+        for (const dlId of dlIds) {
+          await new Promise((res2, rej2) =>
+            api.events.emit('start-install-download', dlId, true, (err, modId) => {
+            if (err) {
+              return rej2(err);
+            }
+            api.store.dispatch(actions.setModEnabled(props.profile.id, modId, true));
+            return res2(undefined);
+          }));
+        }
+
+        api.store.dispatch(actions.setDeploymentNecessary(GAME_ID, true));
+        await assignOverridePath('unstripped_corlib');
+        return resolve(undefined);
+      }));
+    } catch (err) {
+      return raiseMissingAssembliesDialog();
     }
   };
 
@@ -108,9 +165,11 @@ async function ensureUnstrippedAssemblies(props: IProps): Promise<void> {
     switch (packType) {
       case 'core_lib':
         assignOverridePath('BepInEx\\core_lib');
+        raiseForceDownloadNotif();
         return;
       case 'unstripped_corlib':
         assignOverridePath('unstripped_corlib');
+        raiseForceDownloadNotif();
         return;
       default:
         // nop - let the for loop below try to find the pack.
@@ -123,6 +182,7 @@ async function ensureUnstrippedAssemblies(props: IProps): Promise<void> {
       const dllOverridePath = filePath.replace(props.discovery.path + path.sep, '')
                                       .replace(path.sep + 'mono.security.dll', '');
       await assignOverridePath(dllOverridePath);
+      raiseForceDownloadNotif();
       return;
     } catch (err) {
       // nop
@@ -149,47 +209,7 @@ async function ensureUnstrippedAssemblies(props: IProps): Promise<void> {
     }
   }
 
-  const downloader = new UnstrippedAssemblyDownloader(util.getVortexPath('temp'));
-
-  try {
-    const archiveFilePath = await downloader.downloadNewest('full_name', 'denikson-BepInExPack_Valheim');
-    // Give it a second for the download to register in the state.
-    await new Promise((resolve, reject) =>
-      api.events.emit('import-downloads', [ archiveFilePath ], async (dlIds: string[]) => {
-      if (dlIds.length === 0) {
-        return reject(new util.ProcessCanceled('Failed to import archive'));
-      }
-
-      for (const dlId of dlIds) {
-        await new Promise((res2, rej2) =>
-          api.events.emit('start-install-download', dlId, true, (err, modId) => {
-          if (err) {
-            return rej2(err);
-          }
-          api.store.dispatch(actions.setModEnabled(props.profile.id, modId, true));
-          return res2(undefined);
-        }));
-      }
-
-      api.store.dispatch(actions.setDeploymentNecessary(GAME_ID, true));
-      await assignOverridePath('unstripped_corlib');
-      return resolve(undefined);
-    }));
-  } catch (err) {
-    return raiseMissingAssembliesDialog();
-    // api.showDialog('error', 'Missing Unstripped Assemblies', {
-    //   text: 'Vortex was unable to automatically download the required unstripped assemblies. '
-    //       + 'These must be downloaded and manually installed through Vortex by drag-and-dropping the '
-    //       + 'downloaded archive inside Vortex\'s mods page. Mods will not function correctly without this package.',
-    // }, [
-    //   { label: 'Close' },
-    //   {
-    //     label: 'Download BepInEx Pack',
-    //     action: () => util.opn('https://valheim.thunderstore.io/package/denikson/BepInExPack_Valheim/').catch(() => null),
-    //     default: true,
-    //   },
-    // ]);
-  }
+  return runDownloader();
 }
 
 function prepareForModding(context: types.IExtensionContext, discovery: types.IDiscoveryResult) {
