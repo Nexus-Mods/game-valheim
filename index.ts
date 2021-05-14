@@ -119,6 +119,11 @@ async function ensureUnstrippedAssemblies(props: IProps): Promise<void> {
   const runDownloader = async () => {
     const downloader = new UnstrippedAssemblyDownloader(util.getVortexPath('temp'));
     try {
+      if (props.profile?.gameId !== GAME_ID) {
+        // This is a valid scenario when the user tries to manage Valheim
+        //  when the active gameMode is undefined.
+        throw new util.ProcessCanceled('Wrong gamemode');
+      }
       const archiveFilePath = await downloader.downloadNewest('full_name', 'denikson-BepInExPack_Valheim');
       // Give it a second for the download to register in the state.
       await new Promise((resolve, reject) =>
