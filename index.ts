@@ -5,7 +5,7 @@ import { actions, fs, log, selectors, types, util } from 'vortex-api';
 import Parser, { IniFile, WinapiFormat } from 'vortex-parse-ini';
 import * as payloadDeployer from './payloadDeployer';
 
-import { generate, generate as shortid } from 'shortid';
+import { generate } from 'shortid';
 
 import { UnstrippedAssemblyDownloader } from './unstrippedAssembly';
 
@@ -129,7 +129,8 @@ async function ensureUnstrippedAssemblies(props: IProps): Promise<void> {
     const downloader = new UnstrippedAssemblyDownloader(util.getVortexPath('temp'));
     const folderName = generate();
     try {
-      if (props.profile?.gameId !== GAME_ID) {
+      const activeGameMode = selectors.activeGameId(api.getState());
+      if (activeGameMode !== GAME_ID) {
         // This is a valid scenario when the user tries to manage Valheim
         //  when the active gameMode is undefined.
         throw new util.ProcessCanceled('Wrong gamemode');
