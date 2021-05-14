@@ -103,6 +103,13 @@ async function ensureUnstrippedAssemblies(props: IProps): Promise<void> {
           },
         ]),
       },
+      {
+        title: 'Never Show Again',
+        action: (dismiss) => {
+          api.store.dispatch(actions.suppressNotification('forceDownloadNotif', true));
+          dismiss();
+        }
+      }
     ],
   });
 
@@ -157,6 +164,7 @@ async function ensureUnstrippedAssemblies(props: IProps): Promise<void> {
           }));
         }
 
+        api.store.dispatch(actions.suppressNotification('forceDownloadNotif', true));
         api.store.dispatch(actions.setDeploymentNecessary(GAME_ID, true));
         await assignOverridePath('unstripped_corlib');
         try {
