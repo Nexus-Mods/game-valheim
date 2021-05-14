@@ -5,12 +5,14 @@ import { actions, fs, log, selectors, types, util } from 'vortex-api';
 import Parser, { IniFile, WinapiFormat } from 'vortex-parse-ini';
 import * as payloadDeployer from './payloadDeployer';
 
+import { generate, generate as shortid } from 'shortid';
+
 import { UnstrippedAssemblyDownloader } from './unstrippedAssembly';
 
 import {
   BETTER_CONT_EXT, FBX_EXT, GAME_ID, GAME_ID_SERVER,
   genProps, guessModId, IGNORABLE_FILES, INSLIMVML_IDENTIFIER,
-  IProps, ISCMDProps, NEXUS, OBJ_EXT, PackType, STEAM_ID, VBUILD_EXT,
+  IProps, ISCMDProps, NEXUS, OBJ_EXT, PackType, removeDir, STEAM_ID, VBUILD_EXT,
 } from './common';
 import { installBetterCont, installCoreRemover, installFullPack, installInSlimModLoader,
   installVBuildMod, testBetterCont, testCoreRemover, testFullPack, testInSlimModLoader,
@@ -118,6 +120,7 @@ async function ensureUnstrippedAssemblies(props: IProps): Promise<void> {
 
   const runDownloader = async () => {
     const downloader = new UnstrippedAssemblyDownloader(util.getVortexPath('temp'));
+    const folderName = generate();
     try {
       if (props.profile?.gameId !== GAME_ID) {
         // This is a valid scenario when the user tries to manage Valheim
@@ -125,6 +128,17 @@ async function ensureUnstrippedAssemblies(props: IProps): Promise<void> {
         throw new util.ProcessCanceled('Wrong gamemode');
       }
       const archiveFilePath = await downloader.downloadNewest('full_name', 'denikson-BepInExPack_Valheim');
+      // Unfortunately we can't really validate the download's integrity; but we
+      //  can at the very least make sure it's there and isn't just an empty archive.
+      await fs.statAsync(archiveFilePath);
+      const sevenzip = new util.SevenZip();
+      const tempPath = path.join(path.dirname(archiveFilePath), folderName);
+      await sevenzip.extractFull(archiveFilePath, tempPath);
+      const files = await fs.readdirAsync(tempPath);
+      if (files.length === 0) {
+        throw new util.DataInvalid('Invalid archive');
+      }
+
       // Give it a second for the download to register in the state.
       await new Promise((resolve, reject) =>
         api.events.emit('import-downloads', [ archiveFilePath ], async (dlIds: string[]) => {
@@ -145,9 +159,24 @@ async function ensureUnstrippedAssemblies(props: IProps): Promise<void> {
 
         api.store.dispatch(actions.setDeploymentNecessary(GAME_ID, true));
         await assignOverridePath('unstripped_corlib');
+        try {
+          await removeDir(tempPath);
+          await fs.removeAsync(tempPath).catch(err => err.code === 'ENOENT');
+        } catch (err) {
+          log('error', 'failed to cleanup temporary files');
+        }
         return resolve(undefined);
       }));
     } catch (err) {
+      try {
+        const tempPath = path.join(util.getVortexPath('temp'), folderName);
+        await fs.statAsync(tempPath);
+        await removeDir(tempPath);
+      } catch (err2) {
+        log('debug', 'unstripped assembly downloader cleanup failed', err2);
+        // Cleanup failed or is unnecessary.
+      }
+      log('debug', 'unstripped assembly downloader failed', err);
       return raiseMissingAssembliesDialog();
     }
   };

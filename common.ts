@@ -1,5 +1,5 @@
 import turbowalk, { IEntry } from 'turbowalk';
-import { log, selectors, types, util } from 'vortex-api';
+import { fs, log, selectors, types, util } from 'vortex-api';
 
 export declare type PackType = 'none' | 'core_lib' | 'unstripped_corlib';
 export const GAME_ID = 'valheim';
@@ -114,5 +114,17 @@ export function guessModId(fileName: string): string {
     return match[1];
   } else {
     return undefined;
+  }
+}
+
+export async function removeDir(filePath: string) {
+  const filePaths = await walkDirPath(filePath);
+  filePaths.sort((lhs, rhs) => rhs.filePath.length - lhs.filePath.length);
+  for (const entry of filePaths) {
+    try {
+      await fs.removeAsync(entry.filePath);
+    } catch (err) {
+      log('debug', 'failed to remove file', err);
+    }
   }
 }
