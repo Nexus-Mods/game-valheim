@@ -11,12 +11,10 @@ const WORLDS_PATH = path.resolve(appuni.getPath('appData'),
   '..', 'LocalLow', 'IronGate', 'Valheim', 'vortex-worlds');
 
 export function migrate109(api: types.IExtensionApi, oldVersion: string) {
-  log('error', 'starting');
   if (semver.gte(oldVersion, '1.0.9')) {
     return Promise.resolve();
   }
 
-  log('error', 'starting');
   const state = api.getState();
   const discoveryPath = util.getSafe(state,
     ['settings', 'gameMode', 'discovered', GAME_ID, 'path'], undefined);
@@ -24,26 +22,22 @@ export function migrate109(api: types.IExtensionApi, oldVersion: string) {
     return Promise.resolve();
   }
 
-  log('error', 'discovery + activator');
   const profiles: { [profileId: string]: types.IProfile } = util.getSafe(state, ['persistent', 'profiles'], {});
   const profileIds = Object.keys(profiles).filter(id => profiles[id].gameId === GAME_ID);
   if (profileIds.length === 0) {
     return Promise.resolve();
   }
 
-  log('error', 'got profiles');
   const mods: { [modId: string]: types.IMod } =
     util.getSafe(state, ['persistent', 'mods', GAME_ID], {});
   const unstrippedMods = Object.keys(mods).filter(id => mods[id]?.type === 'unstripped-assemblies'
     && util.getSafe(state,
       ['persistent', 'mods', GAME_ID, id, 'attributes', 'modId'], undefined) === 15);
   if (unstrippedMods.length > 0) {
-    log('error', 'got mods');
     return api.awaitUI()
       .then(() => {
         for (const profId of profileIds) {
           for (const modId of unstrippedMods) {
-            log('error', 'disabling', {profId, modId});
             api.store.dispatch(actions.setModEnabled(profId, modId, false));
           }
         }
