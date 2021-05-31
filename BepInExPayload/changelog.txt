@@ -1,6 +1,9 @@
-13 commits since v5.4.9
+16 commits since v5.4.9
 
 Changelog (excluding merges):
+* (63778da) [ghorsington] Use BepInPlugin to check for plugin existence instead of BaseUnityPlugin
+* (e556272) [ghorsington] Bump version
+* (73b91f8) [ghorsington] Don't apply HideAndDontSave by default; add HideManagerGameObject config
 * (61bc728) [ghorsington] Update BepInEx.Harmony
 * (d5d9c5c) [ghorsington] Bump version
 * (ac6d65d) [ghorsington] Update README
