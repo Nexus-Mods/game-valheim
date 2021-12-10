@@ -74,8 +74,8 @@ export function isInSlimVMLInstalled(api: types.IExtensionApi) {
   return enabledMods.find(key => mods[key]?.type === 'inslimvml-mod-loader') !== undefined;
 }
 
-export function genProps(context: types.IExtensionContext, profileId?: string): IProps {
-  const state = context.api.getState();
+export function genProps(api: types.IExtensionApi, profileId?: string): IProps {
+  const state = api.getState();
   profileId = profileId !== undefined
     ? profileId
     : selectors.lastActiveProfileForGame(state, GAME_ID);
@@ -90,7 +90,7 @@ export function genProps(context: types.IExtensionContext, profileId?: string): 
     // log('debug', 'Game is not discovered', { profile, discovery });
     return undefined;
   }
-  return { api: context.api, state, profile, discovery };
+  return { api, state, profile, discovery };
 }
 
 export function genInstructions(srcPath: string,

@@ -1,14 +1,54 @@
 import Promise from 'bluebird';
-import { app as appIn, remote } from 'electron';
 import path from 'path';
 import semver from 'semver';
 import { actions, fs, log, selectors, types, util } from 'vortex-api';
 
+import * as payloadDeployer from './payloadDeployer';
+
 import { GAME_ID } from './common';
 
-const appuni = appIn || remote.app;
-const WORLDS_PATH = path.resolve(appuni.getPath('appData'),
+const WORLDS_PATH = path.resolve(util.getVortexPath('appData'),
   '..', 'LocalLow', 'IronGate', 'Valheim', 'vortex-worlds');
+
+export function migrate1013(api: types.IExtensionApi, oldVersion: string) {
+  if (semver.gte(oldVersion, '1.0.13')) {
+    return Promise.resolve();
+  }
+
+  const t = api.translate;
+  const state = api.getState();
+  const discoveryPath = util.getSafe(state,
+    ['settings', 'gameMode', 'discovered', GAME_ID, 'path'], undefined);
+  if (discoveryPath === undefined) {
+    return Promise.resolve();
+  }
+  api.sendNotification({
+    message: 'Ingame Mod Configuration Manager Removed',
+    type: 'warning',
+    allowSuppress: false,
+    actions: [
+      {
+        title: 'More',
+        action: (dismiss) => {
+          api.showDialog('info', 'Ingame Mod Configuration Manager Removed',
+          {
+            bbcode: t('As you may be aware - Vortex used to have the BepInEx Configuration Manager '
+              + 'plugin included in its BepInEx package. This plugin has now been removed from the package '
+              + 'and is now offered as a toggleable mod on the mods page due to servers automatically kicking '
+              + 'players with this plugin installed.'),
+          },
+          [ { label: 'Close', action: () => dismiss(), default: true } ]);
+        },
+      },
+    ],
+  });
+
+  return api.awaitUI()
+    .then(() => {
+      const lastActive = selectors.lastActiveProfileForGame(state, GAME_ID);
+      return payloadDeployer.onDidPurge(api, lastActive);
+    });
+}
 
 export function migrate109(api: types.IExtensionApi, oldVersion: string) {
   if (semver.gte(oldVersion, '1.0.9')) {

@@ -1,11 +1,9 @@
-import { app, remote } from 'electron';
 import path from 'path';
 import turbowalk, { IEntry } from 'turbowalk';
 import { fs, selectors, types, util } from 'vortex-api';
 import { DOORSTOPPER_HOOK, GAME_ID, IGNORABLE_FILES } from './common';
 
 const invalidModFolders = ['denikson-bepinexpack_valheim', '1f31a-bepinex_valheim_full'];
-const appUni = remote !== undefined ? remote.app : app;
 
 interface IR2ModFile {
   relPath: string;
@@ -15,7 +13,7 @@ interface IR2ModFile {
 // TODO: resolve the location of the cache rather than searching for it in the
 //  default location.
 function getR2CacheLocation() {
-  return path.join(appUni.getPath('appData'), 'r2modmanPlus-local', 'Valheim', 'cache');
+  return path.join(util.getVortexPath('appData'), 'r2modmanPlus-local', 'Valheim', 'cache');
 }
 
 export function userHasR2Installed() {

@@ -11,7 +11,7 @@ const BACKUP_EXT: string = '.vortex_backup';
 
 export async function onWillDeploy(context: types.IExtensionContext,
                                    profileId: string) {
-  const props: IProps = genProps(context, profileId);
+  const props: IProps = genProps(context.api, profileId);
   if (props === undefined) {
     // Do nothing, profile is either undefined, belongs to a different game
     //  or potentially the game is undiscovered.
@@ -27,9 +27,9 @@ export async function onWillDeploy(context: types.IExtensionContext,
   }
 }
 
-export async function onDidPurge(context: types.IExtensionContext,
+export async function onDidPurge(api: types.IExtensionApi,
                                  profileId: string) {
-  const props: IProps = genProps(context, profileId);
+  const props: IProps = genProps(api, profileId);
   if (props === undefined) {
     return;
   }
@@ -38,7 +38,7 @@ export async function onDidPurge(context: types.IExtensionContext,
   } catch (err) {
     const userCanceled = (err instanceof util.UserCanceled);
     err['attachLogOnReport'] = true;
-    context.api.showErrorNotification('Failed to remove payload',
+    api.showErrorNotification('Failed to remove payload',
       err, { allowReport: !userCanceled });
   }
 }

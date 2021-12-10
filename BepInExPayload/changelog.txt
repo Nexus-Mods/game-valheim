@@ -1,18 +1,7 @@
-16 commits since v5.4.9
+4 commits since v5.4.15
 
 Changelog (excluding merges):
-* (63778da) [ghorsington] Use BepInPlugin to check for plugin existence instead of BaseUnityPlugin
-* (e556272) [ghorsington] Bump version
-* (73b91f8) [ghorsington] Don't apply HideAndDontSave by default; add HideManagerGameObject config
-* (61bc728) [ghorsington] Update BepInEx.Harmony
-* (d5d9c5c) [ghorsington] Bump version
-* (ac6d65d) [ghorsington] Update README
-* (0ae9c0c) [ghorsington] Update BepInEx.Harmony
-* (080b111) [ghorsington] Bump HarmonyX and MonoMod
-* (b6ebed8) [ghorsington] Update BepInEx.Harmony
-* (80c2ea8) [ghorsington] Update Doorstop.Unix
-* (78ad6a0) [Ash] Update WindowsConsoleDriver to reuse Utility.UTF8NoBom
-* (352ae3c) [Ash] Remove BOM from log and config files
-* (26c49f9) [ghorsington] Enhance headless mode check
-* (a0900ad) [Kein] Update MainManager GO to use "HideAndDontSave"
-* (3b25865) [Kein] Update ThreadingHelper GO to use "HideAndDontSave"
+* (ea425e6) [ghorsington] Bump version
+* (2c08a56) [ghorsington] Update BepInEx.Harmony
+* (6c5766d) [ghorsington] Print file write date only in console
+* (708ebcd) [ghorsington] Use process name for preloader assembly dump path

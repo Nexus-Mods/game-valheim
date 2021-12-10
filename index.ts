@@ -1,5 +1,4 @@
 import Bluebird from 'bluebird';
-import { app as appIn, remote } from 'electron';
 import * as path from 'path';
 import { actions, fs, log, selectors, types, util } from 'vortex-api';
 import Parser, { IniFile, WinapiFormat } from 'vortex-parse-ini';
@@ -17,12 +16,12 @@ import {
 import { installBetterCont, installCoreRemover, installFullPack, installInSlimModLoader,
   installVBuildMod, testBetterCont, testCoreRemover, testFullPack, testInSlimModLoader,
   testVBuild } from './installers';
-import { migrate103, migrate104, migrate106, migrate109 } from './migrations';
+import { migrate1013, migrate103, migrate104, migrate106, migrate109 } from './migrations';
 import { hasMultipleLibMods, isDependencyRequired } from './tests';
 
 import { migrateR2ToVortex, userHasR2Installed } from './r2Vortex';
 
-const app = remote !== undefined ? remote.app : appIn;
+import { checkConfigManagerUpd, downloadConfigManager } from './githubDownloader';
 
 const STOP_PATTERNS = ['config', 'plugins', 'patchers'];
 function toWordExp(input) {
@@ -108,8 +107,8 @@ async function ensureUnstrippedAssemblies(props: IProps): Promise<void> {
         action: (dismiss) => {
           api.store.dispatch(actions.suppressNotification('forceDownloadNotif', true));
           dismiss();
-        }
-      }
+        },
+      },
     ],
   });
 
@@ -270,6 +269,7 @@ function prepareForModding(context: types.IExtensionContext, discovery: types.ID
     }
   };
   return new Bluebird<void>((resolve, reject) => createDirectories()
+
     .then(() => payloadDeployer.onWillDeploy(context, profile?.id))
     .then(() => resolve())
     .catch(err => reject(err)))
@@ -331,7 +331,7 @@ function main(context: types.IExtensionContext) {
   // });
 
   const getGamePath = () => {
-    const props: IProps = genProps(context);
+    const props: IProps = genProps(context.api);
     return (props?.discovery?.path !== undefined)
       ? props.discovery.path : '.';
   };
@@ -400,6 +400,9 @@ function main(context: types.IExtensionContext) {
     });
   };
 
+  context.registerAction('mod-icons', 100, 'steamcmd', {}, 'SteamCMD Dedicated Server', () => {
+    migrate1013(context.api, '1.0.12');
+  }, () => true);
   // context.registerAction('mod-icons', 100, 'steamcmd', {}, 'SteamCMD Dedicated Server', () => {
   //   context.api.selectDir({})
   //     .then((selectedPath: string) => {
@@ -452,6 +455,7 @@ function main(context: types.IExtensionContext) {
   context.registerMigration((oldVersion: string) => migrate104(context.api, oldVersion));
   context.registerMigration((oldVersion: string) => migrate106(context.api, oldVersion));
   context.registerMigration((oldVersion: string) => migrate109(context.api, oldVersion));
+  context.registerMigration((oldVersion: string) => migrate1013(context.api, oldVersion));
 
   context.registerModType('inslimvml-mod-loader', 20, isSupported, getGamePath,
     (instructions: types.IInstruction[]) => {
@@ -541,14 +545,22 @@ function main(context: types.IExtensionContext) {
         return Promise.resolve();
       }
       return payloadDeployer.onWillDeploy(context, profileId)
-        .then(() => ensureUnstrippedAssemblies(genProps(context, profileId)))
+        .then(() => ensureUnstrippedAssemblies(genProps(context.api, profileId)))
         .catch(err => err instanceof util.UserCanceled
           ? Promise.resolve()
           : Promise.reject(err));
     });
 
     context.api.onAsync('did-purge', async (profileId) =>
-      payloadDeployer.onDidPurge(context, profileId));
+      payloadDeployer.onDidPurge(context.api, profileId));
+
+    context.api.events.on('gamemode-activated',
+      async (gameMode: string) => (gameMode === GAME_ID)
+        ? checkConfigManagerUpd(context.api, true) : null);
+
+    context.api.events.on('check-mods-version',
+      (gameId: string, mods: types.IMod[]) => (gameId === GAME_ID)
+        ? checkConfigManagerUpd(context.api) : null);
   });
 
   return true;
