@@ -192,7 +192,10 @@ async function startDownload(api: types.IExtensionApi,
           actions.setModAttribute(GAME_ID, modId, 'RepoDownload', repo.name),
           actions.setModAttribute(GAME_ID, modId, 'version', repo.latest),
         ];
-        util.batchDispatch(api.store, batch);
+        for (const act of batch) {
+          api.store.dispatch(act);
+        }
+        // util.batchDispatch(api.store, batch);
         return Promise.resolve();
       });
     }, 'ask');
@@ -211,6 +214,9 @@ async function resolveDownloadLink(repo: IGithubRepo, currentReleases: any[]) {
 function getCurrentVersion(api: types.IExtensionApi, repo: IGithubRepo) {
   const state = api.getState();
   const mods = state.persistent.mods[GAME_ID];
+  if (mods === undefined) {
+    return '0.0.0';
+  }
   // const profile = selectors.activeProfile(state);
   // const isEnabled = (modId: string) => util.getSafe(profile, ['modState', modId, 'enabled'], false);
   const mod = Object.values(mods).find(x => x.attributes['RepoDownload'] === repo.name);
