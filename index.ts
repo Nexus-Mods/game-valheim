@@ -9,14 +9,14 @@ import { generate } from 'shortid';
 import { UnstrippedAssemblyDownloader } from './unstrippedAssembly';
 
 import {
-  BETTER_CONT_EXT, FBX_EXT, GAME_ID, GAME_ID_SERVER,
+  BETTER_CONT_EXT, CONF_MANAGER, FBX_EXT, GAME_ID, GAME_ID_SERVER,
   genProps, guessModId, IGNORABLE_FILES, INSLIMVML_IDENTIFIER,
   IProps, ISCMDProps, NEXUS, OBJ_EXT, PackType, removeDir, STEAM_ID, VBUILD_EXT,
 } from './common';
 import { installBetterCont, installCoreRemover, installFullPack, installInSlimModLoader,
   installVBuildMod, testBetterCont, testCoreRemover, testFullPack, testInSlimModLoader,
   testVBuild } from './installers';
-import { migrate1013, migrate103, migrate104, migrate106, migrate109 } from './migrations';
+import { migrate1013, migrate1015, migrate103, migrate104, migrate106, migrate109 } from './migrations';
 import { hasMultipleLibMods, isDependencyRequired } from './tests';
 
 import { migrateR2ToVortex, userHasR2Installed } from './r2Vortex';
@@ -269,7 +269,6 @@ function prepareForModding(context: types.IExtensionContext, discovery: types.ID
     }
   };
   return new Bluebird<void>((resolve, reject) => createDirectories()
-
     .then(() => payloadDeployer.onWillDeploy(context, profile?.id))
     .then(() => resolve())
     .catch(err => reject(err)))
@@ -400,9 +399,6 @@ function main(context: types.IExtensionContext) {
     });
   };
 
-  context.registerAction('mod-icons', 100, 'steamcmd', {}, 'SteamCMD Dedicated Server', () => {
-    migrate1013(context.api, '1.0.12');
-  }, () => true);
   // context.registerAction('mod-icons', 100, 'steamcmd', {}, 'SteamCMD Dedicated Server', () => {
   //   context.api.selectDir({})
   //     .then((selectedPath: string) => {
@@ -456,6 +452,7 @@ function main(context: types.IExtensionContext) {
   context.registerMigration((oldVersion: string) => migrate106(context.api, oldVersion));
   context.registerMigration((oldVersion: string) => migrate109(context.api, oldVersion));
   context.registerMigration((oldVersion: string) => migrate1013(context.api, oldVersion));
+  context.registerMigration((oldVersion: string) => migrate1015(context.api, oldVersion));
 
   context.registerModType('inslimvml-mod-loader', 20, isSupported, getGamePath,
     (instructions: types.IInstruction[]) => {
@@ -536,6 +533,13 @@ function main(context: types.IExtensionContext) {
       const hasBCExt = findInstrMatch(instructions, BETTER_CONT_EXT, path.extname);
       return Bluebird.Promise.Promise.resolve(hasBCExt);
     }, { name: 'Better Continents Mod' });
+
+  context.registerModType('val-conf-man', 25, isSupported,
+    () => path.join(getGamePath(), 'BepInEx'),
+    (instructions: types.IInstruction[]) => {
+      const testRes = findInstrMatch(instructions, CONF_MANAGER, path.basename);
+      return Bluebird.Promise.Promise.resolve(testRes);
+    }, { name: 'Configuration Manager' });
 
   context.once(() => {
     context.api.onAsync('will-deploy', async (profileId) => {

@@ -257,8 +257,10 @@ async function checkForUpdates(api: types.IExtensionApi,
         return Promise.resolve(repo.current);
       }
 
+      const allowReport = !['ECONNRESET', 'EPERM', 'ENOENT', 'EPROTO'].includes(err.code);
       api.showErrorNotification('Unable to update from Github repo',
-        { ...err, details: repo.name });
+        { ...err, repoName: repo.name }, { allowReport });
+
       return Promise.resolve(repo.current);
     });
 }

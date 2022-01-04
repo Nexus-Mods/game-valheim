@@ -15,6 +15,7 @@ export const OBJ_EXT = '.obj';
 export const INSLIMVML_IDENTIFIER = 'inslimvml.ini';
 export const DOORSTOPPER_HOOK = 'winhttp.dll';
 export const BIX_SVML = 'slimvml.loader.dll';
+export const CONF_MANAGER = 'configurationmanager.dll';
 export const ISVML_SKIP = [BIX_SVML, 'slimassist.dll', '0harmony.dll'];
 
 export const NEXUS = 'www.nexusmods.com';
