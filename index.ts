@@ -330,9 +330,11 @@ function main(context: types.IExtensionContext) {
   // });
 
   const getGamePath = () => {
-    const props: IProps = genProps(context.api);
-    return (props?.discovery?.path !== undefined)
-      ? props.discovery.path : '.';
+    //const props: IProps = genProps(context.api);
+    const state = context.api.getState();
+    const discovery = util.getSafe(state,
+      ['settings', 'gameMode', 'discovered', GAME_ID], undefined);
+    return discovery.path;
   };
 
   const isSupported = (gameId: string) => (gameId === GAME_ID);
@@ -534,7 +536,7 @@ function main(context: types.IExtensionContext) {
       return Bluebird.Promise.Promise.resolve(hasBCExt);
     }, { name: 'Better Continents Mod' });
 
-  context.registerModType('val-conf-man', 25, isSupported,
+  context.registerModType('val-conf-man', 20, isSupported,
     () => path.join(getGamePath(), 'BepInEx'),
     (instructions: types.IInstruction[]) => {
       const testRes = findInstrMatch(instructions, CONF_MANAGER, path.basename);

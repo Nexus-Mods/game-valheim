@@ -88,6 +88,7 @@ async function notifyUpdate(api: types.IExtensionApi,
       title: 'Update for {{name}}',
       message: 'Latest: {{latest}}, Installed: {{current}}',
       replace: {
+        name: repo.name,
         latest: repo.latest,
         current: repo.current,
       },

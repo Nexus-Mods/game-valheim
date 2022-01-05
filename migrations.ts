@@ -39,22 +39,24 @@ export function migrate1015(api: types.IExtensionApi, oldVersion: string): Promi
     .catch(err => Promise.resolve(false));
   };
 
-  const purge = () => {
-    // Clean up before the madness
-    return api.awaitUI()
-      .then(() => {
-        const modPaths = {
-          '': path.join(discoveryPath, 'BepInEx', 'plugins'),
-          'bepinex-root-mod': path.join(discoveryPath, 'BepInEx'),
-        };
-        return Promise.map(relevantModTypes, modType => {
-          return fs.ensureDirWritableAsync(modPaths[modType])
-            .then(() => api.emitAndAwait('purge-mods-in-path',
-              GAME_ID, modType, modPaths[modType]));
-      });
-    })
-    .then(() => api.store.dispatch(actions.setDeploymentNecessary(GAME_ID, true)));
-  };
+  const purge = () => Promise.resolve();
+  // { For some reason the path purge fails - the manifest gets cleared, but the
+  //   mod files are left behind - need to investigate this issue separately.
+  //   // Clean up before the madness
+  //   return api.awaitUI()
+  //     .then(() => {
+  //       const modPaths = {
+  //         ['']: path.join(discoveryPath, 'BepInEx', 'plugins'),
+  //         ['bepinex-root-mod']: path.join(discoveryPath, 'BepInEx'),
+  //       };
+  //       return Promise.map(relevantModTypes, modType => {
+  //         return fs.ensureDirWritableAsync(modPaths[modType])
+  //           .then(() => api.emitAndAwait('purge-mods-in-path',
+  //             GAME_ID, modType, modPaths[modType]));
+  //     });
+  //   })
+  //   .then(() => api.store.dispatch(actions.setDeploymentNecessary(GAME_ID, true)));
+  // };
 
   const mods: { [modId: string]: types.IMod } =
     util.getSafe(state, ['persistent', 'mods', GAME_ID], {});
