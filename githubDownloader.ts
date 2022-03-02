@@ -218,9 +218,7 @@ function getCurrentVersion(api: types.IExtensionApi, repo: IGithubRepo) {
   if (mods === undefined) {
     return '0.0.0';
   }
-  // const profile = selectors.activeProfile(state);
-  // const isEnabled = (modId: string) => util.getSafe(profile, ['modState', modId, 'enabled'], false);
-  const mod = Object.values(mods).find(x => x.attributes['RepoDownload'] === repo.name);
+  const mod = Object.values(mods).find(x => x.attributes?.['RepoDownload'] === repo.name);
   if (mod === undefined) {
     return '0.0.0';
   }

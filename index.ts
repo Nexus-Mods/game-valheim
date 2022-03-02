@@ -486,8 +486,14 @@ function main(context: types.IExtensionContext) {
   context.registerModType('valheim-custom-meshes', 10, isSupported,
     () => path.join(modsPath(getGamePath()), 'CustomMeshes'),
     (instructions: types.IInstruction[]) => {
-      const supported = findInstrMatch(instructions, FBX_EXT, path.extname)
-        || findInstrMatch(instructions, OBJ_EXT, path.extname);
+      const modifier = (filePath: string): string => {
+        const segments = filePath.toLowerCase().split(path.sep);
+        return (segments.includes('custommeshes'))
+          ? filePath
+          : path.extname(filePath);
+      };
+      const supported = findInstrMatch(instructions, FBX_EXT, modifier)
+        || findInstrMatch(instructions, OBJ_EXT, modifier);
       return Bluebird.Promise.Promise.resolve(supported);
     }, { name: 'CustomMeshes Mod' });
 
@@ -497,6 +503,14 @@ function main(context: types.IExtensionContext) {
       const textureRgx: RegExp = new RegExp(/^texture_.*.png$/);
       let supported = false;
       for (const instr of instructions) {
+        const segments = (instr.source !== undefined)
+          ? instr.source.toLowerCase().split(path.sep)
+          : [];
+        if (segments.includes('customtextures')) {
+          supported = false;
+          break;
+        }
+
         if ((instr.type === 'copy')
           && textureRgx.test(path.basename(instr.source).toLowerCase())) {
             supported = true;
