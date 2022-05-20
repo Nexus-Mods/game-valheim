@@ -2,7 +2,7 @@ import Promise from 'bluebird';
 import path from 'path';
 
 import { types, util } from 'vortex-api';
-import { BETTER_CONT_EXT, DOORSTOPPER_HOOK, GAME_ID, IGNORABLE_FILES,
+import { BETTER_CONT_EXT, CONF_MANAGER, DOORSTOPPER_HOOK, GAME_ID, IGNORABLE_FILES,
   INSLIMVML_IDENTIFIER, PackType, VBUILD_EXT } from './common';
 
 const INVALID_DIRS = ['core', 'valheim_data'];
@@ -191,6 +191,29 @@ export function testFullPack(files: string[], gameId: string): Promise<types.ISu
     }
   }
   return Promise.resolve({ supported, requiredFiles: [] });
+}
+
+export function testConfManager(files: string[], gameId: string): Promise<types.ISupportedResult> {
+  if (gameId !== GAME_ID) {
+    return Promise.resolve({ supported: false, requiredFiles: [] });
+  }
+
+  const supported = files.find(file => path.basename(file).toLowerCase() === CONF_MANAGER) !== undefined;
+  return Promise.resolve({ supported, requiredFiles: [] });
+}
+
+export function installConfManager(files: string[], destinationPath: string, gameId: string) {
+  const confManager = files.find(file => path.basename(file).toLowerCase() === CONF_MANAGER);
+  const modTypeInstr: types.IInstruction = {
+      type: 'setmodtype',
+      value: 'val-conf-man',
+  };
+  const copyInstr: types.IInstruction = {
+    type: 'copy',
+    source: confManager,
+    destination: path.join('plugins', 'ConfigurationManager', path.basename(confManager)),
+  };
+  return Promise.resolve({ instructions: [modTypeInstr, copyInstr] });
 }
 
 export function installFullPack(files: string[], destinationPath: string, gameId: string) {

@@ -15,7 +15,7 @@ import {
 } from './common';
 import { installBetterCont, installCoreRemover, installFullPack, installInSlimModLoader,
   installVBuildMod, testBetterCont, testCoreRemover, testFullPack, testInSlimModLoader,
-  testVBuild } from './installers';
+  testVBuild, testConfManager, installConfManager } from './installers';
 import { migrate1013, migrate1015, migrate103, migrate104, migrate106, migrate109 } from './migrations';
 import { hasMultipleLibMods, isDependencyRequired } from './tests';
 
@@ -448,6 +448,7 @@ function main(context: types.IExtensionContext) {
   context.registerInstaller('valheim-inslimvm', 20, testInSlimModLoader, installInSlimModLoader);
   context.registerInstaller('valheim-vbuild', 20, testVBuild, installVBuildMod);
   context.registerInstaller('valheim-full-bep-pack', 10, testFullPack, installFullPack);
+  context.registerInstaller('valheim-config-manager', 10, testConfManager, installConfManager)
 
   context.registerMigration((oldVersion: string) => migrate103(context.api, oldVersion));
   context.registerMigration((oldVersion: string) => migrate104(context.api, oldVersion));

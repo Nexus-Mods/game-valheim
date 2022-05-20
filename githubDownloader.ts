@@ -82,7 +82,7 @@ async function notifyUpdate(api: types.IExtensionApi,
   return new Promise((resolve, reject) => {
     api.sendNotification({
       type: 'info',
-      id: `divine-update`,
+      id: `repo-update`,
       noDismiss: true,
       allowSuppress: true,
       title: 'Update for {{name}}',
@@ -117,7 +117,7 @@ async function notifyUpdate(api: types.IExtensionApi,
         {
           title: 'Dismiss',
           action: (dismiss) => {
-            resolve();
+            reject(new util.UserCanceled());
             dismiss();
           },
         },
@@ -193,10 +193,8 @@ async function startDownload(api: types.IExtensionApi,
           actions.setModAttribute(GAME_ID, modId, 'RepoDownload', repo.name),
           actions.setModAttribute(GAME_ID, modId, 'version', repo.latest),
         ];
-        for (const act of batch) {
-          api.store.dispatch(act);
-        }
-        // util.batchDispatch(api.store, batch);
+
+        util.batchDispatch(api.store, batch);
         return Promise.resolve();
       });
     }, 'ask');
