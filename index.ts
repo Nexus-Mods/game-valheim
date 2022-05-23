@@ -153,15 +153,19 @@ async function ensureUnstrippedAssemblies(props: IProps): Promise<void> {
           return reject(new util.ProcessCanceled('Failed to import archive'));
         }
 
-        for (const dlId of dlIds) {
-          await new Promise((res2, rej2) =>
-            api.events.emit('start-install-download', dlId, true, (err, modId) => {
-            if (err) {
-              return rej2(err);
-            }
-            api.store.dispatch(actions.setModEnabled(props.profile.id, modId, true));
-            return res2(undefined);
-          }));
+        try {
+          for (const dlId of dlIds) {
+            await new Promise((res2, rej2) =>
+              api.events.emit('start-install-download', dlId, true, (err, modId) => {
+              if (err) {
+                return rej2(err);
+              }
+              api.store.dispatch(actions.setModEnabled(props.profile.id, modId, true));
+              return res2(undefined);
+            }));
+          }
+        } catch (err) {
+          return reject(err);
         }
 
         api.store.dispatch(actions.suppressNotification('forceDownloadNotif', true));
