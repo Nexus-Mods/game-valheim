@@ -111,6 +111,13 @@ async function notifyUpdate(api: types.IExtensionApi,
                     dismiss();
                   },
                 },
+                {
+                  label: 'Close',
+                  action: () => {
+                    reject(new util.UserCanceled());
+                    dismiss();
+                  },
+                },
               ]);
           },
         },
@@ -231,6 +238,7 @@ export async function checkConfigManagerUpd(api: types.IExtensionApi, force?: bo
 async function checkForUpdates(api: types.IExtensionApi,
                                repo: IGithubRepo,
                                force?: boolean): Promise<string> {
+  force = force && repo.name !== REPOS.configManager.name;
   repo.current = getCurrentVersion(api, repo);
   return getLatestReleases(api, repo)
     .then(async currentReleases => {
