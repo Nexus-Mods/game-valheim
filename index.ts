@@ -23,7 +23,7 @@ import { migrateR2ToVortex, userHasR2Installed } from './r2Vortex';
 
 import { checkConfigManagerUpd, downloadConfigManager } from './githubDownloader';
 
-const STOP_PATTERNS = ['config', 'plugins', 'patchers'];
+const STOP_PATTERNS = ['plugins', 'patchers'];
 function toWordExp(input) {
   return '(^|/)' + input + '(/|$)';
 }
