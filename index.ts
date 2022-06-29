@@ -11,7 +11,7 @@ import { UnstrippedAssemblyDownloader } from './unstrippedAssembly';
 import {
   BETTER_CONT_EXT, CONF_MANAGER, FBX_EXT, GAME_ID, GAME_ID_SERVER,
   genProps, guessModId, IGNORABLE_FILES, INSLIMVML_IDENTIFIER,
-  IProps, ISCMDProps, NEXUS, OBJ_EXT, PackType, removeDir, STEAM_ID, VBUILD_EXT,
+  IProps, ISCMDProps, NEXUS, OBJ_EXT, PackType, removeDir, STEAM_ID, VBUILD_EXT, walkDirPath,
 } from './common';
 import { installBetterCont, installCoreRemover, installFullPack, installInSlimModLoader,
   installVBuildMod, testBetterCont, testCoreRemover, testFullPack, testInSlimModLoader,
@@ -22,6 +22,7 @@ import { hasMultipleLibMods, isDependencyRequired } from './tests';
 import { migrateR2ToVortex, userHasR2Installed } from './r2Vortex';
 
 import { checkConfigManagerUpd, downloadConfigManager } from './githubDownloader';
+import { IEntry } from 'turbowalk';
 
 const STOP_PATTERNS = ['plugins', 'patchers'];
 function toWordExp(input) {
@@ -586,6 +587,40 @@ function main(context: types.IExtensionContext) {
     context.api.events.on('check-mods-version',
       (gameId: string, mods: types.IMod[]) => (gameId === GAME_ID)
         ? checkConfigManagerUpd(context.api) : null);
+
+    context.api.events.on('did-install-mod', async (gameId, archiveId, modId) => {
+      if (gameId !== GAME_ID) {
+        return;
+      }
+
+      // Point of this functionality is to set the version information
+      //  for mods that are installed from an external site.
+      const state = context.api.getState();
+      const installPath = selectors.installPathForGame(state, gameId);
+      const mod: types.IMod = state.persistent.mods?.[gameId]?.[modId];
+      if ((installPath === undefined)
+      || (mod?.installationPath === undefined)
+      || (!!mod.attributes?.version)) {
+        return;
+      }
+      const modPath = path.join(installPath, mod.installationPath);
+      try {
+        const fileEntries: IEntry[] = await walkDirPath(modPath);
+        const manifestFile = fileEntries.find(entry => path.basename(entry.filePath.toLowerCase()) === 'manifest.json');
+        if (manifestFile === undefined) {
+          return;
+        }
+
+        const manifestData = await fs.readFileAsync(manifestFile.filePath, { encoding: 'utf8' });
+        const data = JSON.parse(manifestData);
+        if (data['version_number'] !== undefined) {
+          context.api.store.dispatch(actions.setModAttribute(gameId, modId, 'version', data['version_number']));
+        }
+      } catch (err) {
+        // This is a QoL feature, we don't care if it fails.
+        return;
+      }
+    })
   });
 
   return true;
