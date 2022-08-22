@@ -509,7 +509,7 @@ function main(context: types.IExtensionContext) {
       const textureRgx: RegExp = new RegExp(/^texture_.*.png$/);
       let supported = false;
       for (const instr of instructions) {
-        const segments = (instr.source !== undefined)
+        const segments = (!!instr.source)
           ? instr.source.toLowerCase().split(path.sep)
           : [];
         if (segments.includes('customtextures')) {
