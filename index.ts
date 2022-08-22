@@ -59,26 +59,26 @@ async function ensureUnstrippedAssemblies(props: IProps): Promise<void> {
   const fullPackCorLibNew = path.join(props.discovery.path,
     'unstripped_corlib', 'mono.security.dll');
 
-  const url = path.join(NEXUS, 'valheim', 'mods', '1202') + `?tab=files&file_id=4899&nmm=1`;
-  const raiseMissingAssembliesDialog = () => new Promise<void>((resolve, reject) => {
-    api.showDialog('info', 'Missing unstripped assemblies', {
-      bbcode: t('Valheim\'s assemblies are distributed in an "optimised" state to reduce required '
-      + 'disk space. This unfortunately means that Valheim\'s modding capabilities are also affected.{{br}}{{br}}'
-      + 'In order to mod Valheim, the unoptimised/unstripped assemblies are required - please download these '
-      + 'from Nexus Mods.{{br}}{{br}} You can choose the Vortex/mod manager download or manual download '
-      + '(simply drag and drop the archive into the mods dropzone to add it to Vortex).{{br}}{{br}}'
-      + 'Vortex will then be able to install the assemblies where they are needed to enable '
-      + 'modding, leaving the original ones untouched.', { replace: { br: '[br][/br]' } }),
-    }, [
-      { label: 'Cancel', action: () => reject(new util.UserCanceled()) },
-      {
-        label: 'Download Unstripped Assemblies',
-        action: () => util.opn(url)
-          .catch(err => null)
-          .finally(() => resolve()),
-      },
-    ]);
-  });
+  // const url = path.join(NEXUS, 'valheim', 'mods', '1202') + `?tab=files&file_id=4899&nmm=1`;
+  // const raiseMissingAssembliesDialog = () => new Promise<void>((resolve, reject) => {
+  //   api.showDialog('info', 'Missing unstripped assemblies', {
+  //     bbcode: t('Valheim\'s assemblies are distributed in an "optimised" state to reduce required '
+  //     + 'disk space. This unfortunately means that Valheim\'s modding capabilities are also affected.{{br}}{{br}}'
+  //     + 'In order to mod Valheim, the unoptimised/unstripped assemblies are required - please download these '
+  //     + 'from Nexus Mods.{{br}}{{br}} You can choose the Vortex/mod manager download or manual download '
+  //     + '(simply drag and drop the archive into the mods dropzone to add it to Vortex).{{br}}{{br}}'
+  //     + 'Vortex will then be able to install the assemblies where they are needed to enable '
+  //     + 'modding, leaving the original ones untouched.', { replace: { br: '[br][/br]' } }),
+  //   }, [
+  //     { label: 'Cancel', action: () => reject(new util.UserCanceled()) },
+  //     {
+  //       label: 'Download Unstripped Assemblies',
+  //       action: () => util.opn(url)
+  //         .catch(err => null)
+  //         .finally(() => resolve()),
+  //     },
+  //   ]);
+  // });
 
   const raiseForceDownloadNotif = () => api.sendNotification({
     message: t('Game updated - Updated assemblies pack required.'),
@@ -190,7 +190,7 @@ async function ensureUnstrippedAssemblies(props: IProps): Promise<void> {
         // Cleanup failed or is unnecessary.
       }
       log('debug', 'unstripped assembly downloader failed', err);
-      return raiseMissingAssembliesDialog();
+      // return raiseMissingAssembliesDialog();
     }
   };
 
@@ -281,7 +281,7 @@ function prepareForModding(context: types.IExtensionContext, discovery: types.ID
 }
 
 function modsPath(gamePath: string) {
-  return path.join(gamePath, 'BepInEx', 'plugins');
+  return gamePath !== undefined ? path.join(gamePath, 'BepInEx', 'plugins') : '.';
 }
 
 function main(context: types.IExtensionContext) {
@@ -339,6 +339,10 @@ function main(context: types.IExtensionContext) {
     const state = context.api.getState();
     const discovery = util.getSafe(state,
       ['settings', 'gameMode', 'discovered', GAME_ID], undefined);
+    if (discovery?.path === undefined) {
+      context.api.showErrorNotification('Valheim was not discovered', 'Please re-install the game.', { allowReport: false });
+      throw new util.ProcessCanceled('Game path not found');
+    }
     return discovery.path;
   };
 
@@ -360,6 +364,9 @@ function main(context: types.IExtensionContext) {
 
   const vbuildDepTest = () => {
     const gamePath = getGamePath();
+    if (gamePath === undefined) {
+      return undefined;
+    }
     const buildShareAssembly = path.join(gamePath, 'InSlimVML', 'Mods', 'CR-BuildShare_VML.dll');
     return isDependencyRequired(context.api, {
       dependentModType: 'vbuild-mod',
@@ -371,6 +378,9 @@ function main(context: types.IExtensionContext) {
   };
 
   const customMeshesTest = () => {
+    if (getGamePath() === undefined) {
+      return undefined;
+    }
     const basePath = modsPath(getGamePath());
     const requiredAssembly = path.join(basePath, 'CustomMeshes.dll');
     return isDependencyRequired(context.api, {
@@ -383,6 +393,9 @@ function main(context: types.IExtensionContext) {
   };
 
   const customTexturesTest = () => {
+    if (getGamePath() === undefined) {
+      return undefined;
+    }
     const basePath = modsPath(getGamePath());
     const requiredAssembly = path.join(basePath, 'CustomTextures.dll');
     return isDependencyRequired(context.api, {
@@ -395,6 +408,9 @@ function main(context: types.IExtensionContext) {
   };
 
   const betterContinentsTest = () => {
+    if (getGamePath() === undefined) {
+      return undefined;
+    }
     const basePath = modsPath(getGamePath());
     const requiredAssembly = path.join(basePath, 'BetterContinents.dll');
     return isDependencyRequired(context.api, {
@@ -431,7 +447,7 @@ function main(context: types.IExtensionContext) {
     const state = context.api.getState();
     const activeGameId = selectors.activeGameId(state);
     return userHasR2Installed()
-      && (getGamePath() !== '.')
+      && (getGamePath() !== undefined)
       && (activeGameId === GAME_ID);
   });
 
@@ -469,7 +485,7 @@ function main(context: types.IExtensionContext) {
     }, { name: 'InSlimVML Mod Loader' });
 
   context.registerModType('inslimvml-mod', 10, isSupported,
-    () => path.join(getGamePath(), 'InSlimVML', 'Mods'), (instructions: types.IInstruction[]) => {
+    () => getGamePath() !== undefined ? path.join(getGamePath(), 'InSlimVML', 'Mods') : undefined, (instructions: types.IInstruction[]) => {
       // Unfortunately there are currently no identifiers to differentiate between
       //  BepInEx and InSlimVML mods and therefore cannot automatically assign
       //  this modType automatically. We do know that CR-AdvancedBuilder.dll is an InSlim
@@ -483,14 +499,14 @@ function main(context: types.IExtensionContext) {
       return Bluebird.Promise.Promise.resolve(testRes);
     }, { name: 'InSlimVML Mod' });
 
-  context.registerModType('vbuild-mod', 10, isSupported, () => path.join(getGamePath(), 'AdvancedBuilder', 'Builds'),
+  context.registerModType('vbuild-mod', 10, isSupported, () => getGamePath() !== undefined ? path.join(getGamePath(), 'AdvancedBuilder', 'Builds') : undefined,
     (instructions: types.IInstruction[]) => {
       const res = findInstrMatch(instructions, VBUILD_EXT, path.extname);
       return Bluebird.Promise.Promise.resolve(res);
     }, { name: 'BuildShare Mod' });
 
   context.registerModType('valheim-custom-meshes', 10, isSupported,
-    () => path.join(modsPath(getGamePath()), 'CustomMeshes'),
+    () => getGamePath() !== undefined ? path.join(modsPath(getGamePath()), 'CustomMeshes') : undefined,
     (instructions: types.IInstruction[]) => {
       const modifier = (filePath: string): string => {
         const segments = filePath.toLowerCase().split(path.sep);
@@ -504,7 +520,7 @@ function main(context: types.IExtensionContext) {
     }, { name: 'CustomMeshes Mod' });
 
   context.registerModType('valheim-custom-textures', 10, isSupported,
-    () => path.join(modsPath(getGamePath()), 'CustomTextures'),
+    () => getGamePath() !== undefined ? path.join(modsPath(getGamePath()), 'CustomTextures') : undefined,
     (instructions: types.IInstruction[]) => {
       const textureRgx: RegExp = new RegExp(/^texture_.*.png$/);
       let supported = false;
@@ -534,7 +550,8 @@ function main(context: types.IExtensionContext) {
       return Bluebird.Promise.Promise.resolve(supported);
     }, { name: 'Unstripped Assemblies' });
 
-  context.registerModType('bepinex-root-mod', 25, isSupported, () => path.join(getGamePath(), 'BepInEx'),
+  context.registerModType('bepinex-root-mod', 25, isSupported,
+  () => getGamePath() !== undefined ? path.join(getGamePath(), 'BepInEx') : undefined,
   (instructions: types.IInstruction[]) => {
     const matcher = (filePath: string) => {
       const segments = filePath.split(path.sep);
@@ -550,14 +567,14 @@ function main(context: types.IExtensionContext) {
     }, { name: 'BepInEx Root Mod' });
 
   context.registerModType('better-continents-mod', 25, isSupported,
-    () => path.join(getGamePath(), 'vortex-worlds'),
+    () => getGamePath() !== undefined ? path.join(getGamePath(), 'vortex-worlds') : undefined,
     (instructions: types.IInstruction[]) => {
       const hasBCExt = findInstrMatch(instructions, BETTER_CONT_EXT, path.extname);
       return Bluebird.Promise.Promise.resolve(hasBCExt);
     }, { name: 'Better Continents Mod' });
 
   context.registerModType('val-conf-man', 20, isSupported,
-    () => path.join(getGamePath(), 'BepInEx'),
+    () => getGamePath() !== undefined ? path.join(getGamePath(), 'BepInEx') : undefined,
     (instructions: types.IInstruction[]) => {
       const testRes = findInstrMatch(instructions, CONF_MANAGER, path.basename);
       return Bluebird.Promise.Promise.resolve(testRes);
