@@ -1,0 +1,25 @@
+{
+  "name": "game-valheim",
+  "version": "1.0.23",
+  "description": "Support for Valheim",
+  "main": "./dist/index.js",
+  "scripts": {
+    "webpack": "node ./node_modules/webpack/bin/webpack --config webpack.config.js --progress --profile --color",
+    "build": "npm run webpack && extractInfo && copyfiles -f ./gameart.jpg ./dist/",
+    "bundle7z": "del game-valheim.7z && 7z a -t7z game-valheim.7z .\\dist\\index.js .\\dist\\info.json .\\gameart.jpg .\\BepInExPayload"
+  },
+  "author": "Black Tree Gaming Ltd.",
+  "license": "GPL-3.0",
+  "devDependencies": {
+    "7z-bin": "Nexus-Mods/7z-bin",
+    "@types/redux": "^3.6.0",
+    "bluebird": "^3.7.2",
+    "copyfiles": "^2.4.1",
+    "shortid": "2.2.8",
+    "ts-loader": "^6.0.4",
+    "typescript": "^3.5.2",
+    "vortex-api": "github:Nexus-Mods/vortex-api",
+    "webpack": "^5.77.0",
+    "webpack-cli": "^5.0.1"
+  }
+}
