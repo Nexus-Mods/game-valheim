@@ -335,15 +335,8 @@ function main(context: types.IExtensionContext) {
   // });
 
   const getGamePath = () => {
-    //const props: IProps = genProps(context.api);
     const state = context.api.getState();
-    const discovery = util.getSafe(state,
-      ['settings', 'gameMode', 'discovered', GAME_ID], undefined);
-    if (discovery?.path === undefined) {
-      context.api.showErrorNotification('Valheim was not discovered', 'Please re-install the game.', { allowReport: false });
-      throw new util.ProcessCanceled('Game path not found');
-    }
-    return discovery.path;
+    return state.settings.gameMode.discovered?.[GAME_ID]?.path;
   };
 
   const isSupported = (gameId: string) => (gameId === GAME_ID);
