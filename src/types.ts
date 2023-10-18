@@ -6,4 +6,9 @@ export interface IGithubRepo {
   coerceVersion: (version: string) => string;
   latest?: string;
   current?: string;
+  downloadUrl?: string;
+}
+
+export interface IReleaseMap {
+  [tagName: string]: string;
 }

@@ -7,8 +7,36 @@ import * as payloadDeployer from './payloadDeployer';
 
 import { CONF_MANAGER, GAME_ID, walkDirPath } from './common';
 
-const WORLDS_PATH = path.resolve(util.getVortexPath('appData'),
-  '..', 'LocalLow', 'IronGate', 'Valheim', 'vortex-worlds');
+const WORLDS_PATH = path.resolve(util.getVortexPath('appData'),'..', 'LocalLow', 'IronGate', 'Valheim', 'vortex-worlds');
+
+export function migrate1025(api: types.IExtensionApi, oldVersion: string): Promise<void> {
+  if (semver.gte(oldVersion, '1.0.25')) {
+    return Promise.resolve();
+  }
+  return api.awaitUI()
+    .then(() => {
+      const t = api.translate;
+      api.sendNotification({
+        type: 'info',
+        message: 'Important Valheim Update Information',
+        actions: [
+          { title: 'More', action: (dismiss) => {
+            api.showDialog('info', 'Valheim Update 1.0.25', {
+              bbcode: t('Aside from updating the BepInEx payload to 5.4.22.[br][/br][br][/br]'
+                      + 'This update adds a new button to the mods page "Update BepInEx" which allows '
+                      + 'users to change the BepInEx version used by Vortex.[br][/br][br][/br]'
+                      + 'Available versions are pulled directly from the BepInEx github repository, '
+                      + 'and will maintain any existing configuration files in your game directory.[br][/br][br][/br]'
+                      + 'If for any reason the BepInEx payload deployed by Vortex is not ideal for your mod setup, and you '
+                      + 'require a custom version, the payload can be replaced manually using the "Open BepInEx Payload Folder" button '
+                      + 'which will open the location of the payload itself in your file browser. Any changes there will be reflected in '
+                      + 'your game directory upon deployment.'),
+            }, [ { label: 'Close', action: () => dismiss(), default: true } ]);
+          }}
+        ],
+      });
+    });
+}
 
 export function migrate1015(api: types.IExtensionApi, oldVersion: string): Promise<void> {
   // yet another bloody migration.... ugh!

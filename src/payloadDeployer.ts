@@ -1,13 +1,67 @@
+/* eslint-disable max-lines-per-function */
 import crypto from 'crypto';
 import path from 'path';
 import { IEntry } from 'turbowalk';
-import { fs, types, util } from 'vortex-api';
+import { fs, selectors, types, util } from 'vortex-api';
 
-import { DOORSTOPPER_HOOK, GAME_ID, genInstructions, genProps, IProps,
-  ISVML_SKIP, walkDirPath } from './common';
+import { deploy, DOORSTOPPER_HOOK, GAME_ID, genInstructions, genProps, IProps,
+         ISVML_SKIP, purge, removeDir, walkDirPath, IGNORABLE_FILES } from './common';
+
+import { doDownload } from './githubDownloader';
 
 const PAYLOAD_PATH = path.join(__dirname, 'BepInExPayload');
 const BACKUP_EXT: string = '.vortex_backup';
+const CONFIG_EXT: string = '.cfg';
+
+export async function openPayloadDir(api: types.IExtensionApi) {
+  util.opn(PAYLOAD_PATH);
+}
+
+export async function replacePayload(api: types.IExtensionApi,
+                                     downloadUrl: string) {
+  const profileId = selectors.lastActiveProfileForGame(api.getState(), GAME_ID);
+  const props: IProps = genProps(api, profileId);
+  if (props === undefined) {
+    // Do nothing, profile is either undefined, belongs to a different game
+    //  or potentially the game is undiscovered.
+    return;
+  }
+
+  api.showDialog('question', 'Replace Payload', {
+    bbcode: api.translate('This action will replace the BepInEx payload for all of your Valheim profiles.[br][/br][br][/br]'
+                        + 'Vortex will purge your mods, and re-deploy as part of this operation.[br][/br][br][/br]'
+                        + 'Are you sure you wish to proceed?'),
+  }, [
+    { label: 'Proceed' }, { label: 'Cancel' },
+  ]).then(async res => {
+    if (res.action === 'Proceed') {
+      try {
+        await purge(api);
+        // In this case we only want to remove the BIX files themselves, any existing plugins,
+        //  patchers or configuration files should be left in place.
+        const filterEntries = IGNORABLE_FILES.filter(fileName =>
+          path.extname(fileName) !== CONFIG_EXT);
+        const filter = (entry: IEntry) => filterEntries.map(fileName => fileName.toLowerCase())
+          .indexOf(path.basename(entry.filePath).toLowerCase()) !== -1;
+        await removeDir(PAYLOAD_PATH, filter);
+        await fs.ensureDirWritableAsync(PAYLOAD_PATH);
+        const filePath = path.join(util.getVortexPath('temp'), path.basename(downloadUrl));
+        await doDownload(downloadUrl, filePath);
+        const sevenZip = new util.SevenZip();
+        await sevenZip.extractFull(filePath, PAYLOAD_PATH);
+        await deploy(api);
+        await fs.removeAsync(filePath).catch(err => Promise.resolve());
+      } catch (err) {
+        const userCanceled = (err instanceof util.UserCanceled);
+        err['attachLogOnReport'] = true;
+        api.showErrorNotification('Failed to replace payload', err, { allowReport: !userCanceled });
+      }
+    } else {
+      // Cancel
+      return;
+    }
+  });
+}
 
 export async function onWillDeploy(context: types.IExtensionContext,
                                    profileId: string) {
@@ -23,7 +77,7 @@ export async function onWillDeploy(context: types.IExtensionContext,
     const userCanceled = (err instanceof util.UserCanceled);
     err['attachLogOnReport'] = true;
     context.api.showErrorNotification('Failed to deploy payload',
-      err, { allowReport: !userCanceled });
+                                      err, { allowReport: !userCanceled });
   }
 }
 
@@ -39,7 +93,7 @@ export async function onDidPurge(api: types.IExtensionApi,
     const userCanceled = (err instanceof util.UserCanceled);
     err['attachLogOnReport'] = true;
     api.showErrorNotification('Failed to remove payload',
-      err, { allowReport: !userCanceled });
+                              err, { allowReport: !userCanceled });
   }
 }
 
@@ -47,17 +101,17 @@ async function purgePayload(props: IProps) {
   if (props === undefined) {
     return;
   }
-  try {
-    const fileEntries: IEntry[] = await walkDirPath(PAYLOAD_PATH);
-    const srcPath = PAYLOAD_PATH;
-    const destPath = props.discovery.path;
-    const instructions: types.IInstruction[] = genInstructions(srcPath, destPath, fileEntries);
-    for (const instr of instructions) {
-      await fs.removeAsync(instr.destination)
-        .catch({ code: 'ENOENT' }, () => Promise.resolve());
+  const fileEntries: IEntry[] = await walkDirPath(PAYLOAD_PATH);
+  const srcPath = PAYLOAD_PATH;
+  const destPath = props.discovery.path;
+  const instructions: types.IInstruction[] = genInstructions(srcPath, destPath, fileEntries);
+  for (const instr of instructions) {
+    // Don't remove the config files
+    if (path.extname(instr.destination) === CONFIG_EXT) {
+      continue;
     }
-  } catch (err) {
-    throw err;
+    await fs.removeAsync(instr.destination)
+      .catch({ code: 'ENOENT' }, () => Promise.resolve());
   }
 }
 
@@ -72,6 +126,10 @@ async function ensureLatest(instruction: types.IInstruction) {
     const srcHash = await getHash(instruction.source);
     const destHash = await getHash(instruction.destination);
     if (destHash !== srcHash) {
+      if (path.extname(instruction.destination) === CONFIG_EXT) {
+        // Don't overwrite the config files
+        return;
+      }
       await fs.removeAsync(instruction.destination);
       await fs.ensureDirWritableAsync(path.dirname(instruction.destination));
       await fs.copyAsync(instruction.source, instruction.destination);
