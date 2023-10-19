@@ -42,7 +42,7 @@ Vortex's payload includes a tested BepInEx package (5.4.22 at this time) added w
 Alternatively, the payload can be modified manually - clicking the "Open BepInEx Payload Folder" button in the mods page will open its location in your file explorer/browser. Any changes to the payload's directory structure will be reflected in the game's root directory whenever a deployment event occurs. It's HIGHLY advised not to add files to the payload which aren't part of the BepInEx package.
 
 ### Extra information
-* You can check Valheim version information by going Vortex > Extensions > Click 'Show bundled' > Game: Valheim > Version should be greater than 1.0.25
+* You can check Valheim version information by going Vortex > Extensions > Click 'Show bundled' > Game: Valheim > Version should be greater than 1.1.0
 * Purging your mods will also remove the BepInEx payload but will leave any configuration files behind (`BepInEx/config/*.cfg`)
 
 # Further Support
