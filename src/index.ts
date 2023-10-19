@@ -21,7 +21,7 @@ import {
 import { installBetterCont, installCoreRemover, installFullPack, installInSlimModLoader,
          installVBuildMod, testBetterCont, testCoreRemover, testFullPack, testInSlimModLoader,
          testVBuild, testConfManager, installConfManager } from './installers';
-import { migrate1013, migrate1015, migrate1025, migrate103, migrate104, migrate106, migrate109 } from './migrations';
+import { migrate1013, migrate1015, migrate110, migrate103, migrate104, migrate106, migrate109 } from './migrations';
 import { hasMultipleLibMods, isDependencyRequired } from './tests';
 
 import { migrateR2ToVortex, userHasR2Installed } from './r2Vortex';
@@ -466,7 +466,7 @@ function main(context: types.IExtensionContext) {
   context.registerMigration((oldVersion: string) => migrate109(context.api, oldVersion));
   context.registerMigration((oldVersion: string) => migrate1013(context.api, oldVersion));
   context.registerMigration((oldVersion: string) => migrate1015(context.api, oldVersion));
-  context.registerMigration((oldVersion: string) => migrate1025(context.api, oldVersion));
+  context.registerMigration((oldVersion: string) => migrate110(context.api, oldVersion));
 
   context.registerModType('inslimvml-mod-loader', 20, isSupported, getGamePath,
     (instructions: types.IInstruction[]) => {
