@@ -16,12 +16,14 @@ import { UnstrippedAssemblyDownloader } from './unstrippedAssembly';
 import {
   BETTER_CONT_EXT, CONF_MANAGER, FBX_EXT, GAME_ID,
   genProps, guessModId, IGNORABLE_FILES, INSLIMVML_IDENTIFIER,
-  IProps, OBJ_EXT, PackType, removeDir, STEAM_ID, VBUILD_EXT, walkDirPath,
+  IProps, NAMESPACE, OBJ_EXT, PackType, removeDir, STEAM_ID, VBUILD_EXT, walkDirPath,
 } from './common';
 import { installBetterCont, installCoreRemover, installFullPack, installInSlimModLoader,
          installVBuildMod, testBetterCont, testCoreRemover, testFullPack, testInSlimModLoader,
          testVBuild, testConfManager, installConfManager } from './installers';
-import { migrate1013, migrate1015, migrate110, migrate103, migrate104, migrate106, migrate109 } from './migrations';
+
+// Migrations are broken.
+// import { migrate1013, migrate1015, migrate110, migrate103, migrate104, migrate106, migrate109 } from './migrations';
 import { hasMultipleLibMods, isDependencyRequired } from './tests';
 
 import { migrateR2ToVortex, userHasR2Installed } from './r2Vortex';
@@ -78,29 +80,8 @@ async function ensureUnstrippedAssemblies(props: IProps): Promise<void> {
   const fullPackCorLibNew = path.join(props.discovery.path,
                                       'unstripped_corlib', 'mono.security.dll');
 
-  // const url = path.join(NEXUS, 'valheim', 'mods', '1202') + `?tab=files&file_id=4899&nmm=1`;
-  // const raiseMissingAssembliesDialog = () => new Promise<void>((resolve, reject) => {
-  //   api.showDialog('info', 'Missing unstripped assemblies', {
-  //     bbcode: t('Valheim\'s assemblies are distributed in an "optimised" state to reduce required '
-  //     + 'disk space. This unfortunately means that Valheim\'s modding capabilities are also affected.{{br}}{{br}}'
-  //     + 'In order to mod Valheim, the unoptimised/unstripped assemblies are required - please download these '
-  //     + 'from Nexus Mods.{{br}}{{br}} You can choose the Vortex/mod manager download or manual download '
-  //     + '(simply drag and drop the archive into the mods dropzone to add it to Vortex).{{br}}{{br}}'
-  //     + 'Vortex will then be able to install the assemblies where they are needed to enable '
-  //     + 'modding, leaving the original ones untouched.', { replace: { br: '[br][/br]' } }),+*
-  //   }, [
-  //     { label: 'Cancel', action: () => reject(new util.UserCanceled()) },
-  //     {
-  //       label: 'Download Unstripped Assemblies',
-  //       action: () => util.opn(url)
-  //         .catch(err => null)
-  //         .finally(() => resolve()),
-  //     },
-  //   ]);
-  // });
-
   const raiseForceDownloadNotif = () => api.sendNotification({
-    message: t('Game updated - Updated assemblies pack required.'),
+    message: t('Game updated - Updated assemblies pack required.', { ns: NAMESPACE }),
     type: 'info',
     id: 'forceDownloadNotif',
     noDismiss: true,
@@ -113,7 +94,7 @@ async function ensureUnstrippedAssemblies(props: IProps): Promise<void> {
                   + 'Vortex has detected that you have previously installed unstripped Unity assemblies / a BepInEx pack, but cannot know for sure whether these files are up to date. '
                   + 'If you are unsure, Vortex can download and install the latest required files for you.{{lb}}'
                   + 'Please note that all mods must also be updated in order for them to function with the new game version.',
-                    { replace: { lb: '[br][/br][br][/br]', br: '[br][/br]' } }),
+                    { ns: NAMESPACE, replace: { lb: '[br][/br][br][/br]', br: '[br][/br]' } }),
         }, [
           { label: 'Close' },
           {
@@ -357,10 +338,10 @@ function main(context: types.IExtensionContext) {
     if (gamePath === undefined) {
       return undefined;
     }
-    const buildShareAssembly = path.join(gamePath, 'InSlimVML', 'Mods', 'CR-BuildShare_VML.dll');
+    const buildShareAssembly = path.join(modsPath(gamePath), 'BuildShareV2.dll');
     return isDependencyRequired(context.api, {
       dependentModType: 'vbuild-mod',
-      masterModType: 'inslimvml-mod',
+      masterModType: '',
       masterName: 'BuildShare (AdvancedBuilding)',
       masterURL: 'https://www.nexusmods.com/valheim/mods/5',
       requiredFiles: [ buildShareAssembly ],
@@ -460,13 +441,15 @@ function main(context: types.IExtensionContext) {
   context.registerInstaller('valheim-full-bep-pack', 10, testFullPack, installFullPack);
   context.registerInstaller('valheim-config-manager', 10, testConfManager, installConfManager)
 
-  context.registerMigration((oldVersion: string) => migrate103(context.api, oldVersion));
-  context.registerMigration((oldVersion: string) => migrate104(context.api, oldVersion));
-  context.registerMigration((oldVersion: string) => migrate106(context.api, oldVersion));
-  context.registerMigration((oldVersion: string) => migrate109(context.api, oldVersion));
-  context.registerMigration((oldVersion: string) => migrate1013(context.api, oldVersion));
-  context.registerMigration((oldVersion: string) => migrate1015(context.api, oldVersion));
-  context.registerMigration((oldVersion: string) => migrate110(context.api, oldVersion));
+  // Migrations in the extension manager are broken and are crashing the renderer thread!
+  //  will uncomment these once the issue is fixed.
+  // context.registerMigration((oldVersion: string) => migrate103(context.api, oldVersion));
+  // context.registerMigration((oldVersion: string) => migrate104(context.api, oldVersion));
+  // context.registerMigration((oldVersion: string) => migrate106(context.api, oldVersion));
+  // context.registerMigration((oldVersion: string) => migrate109(context.api, oldVersion));
+  // context.registerMigration((oldVersion: string) => migrate1013(context.api, oldVersion));
+  // context.registerMigration((oldVersion: string) => migrate1015(context.api, oldVersion));
+  // context.registerMigration((oldVersion: string) => migrate110(context.api, oldVersion));
 
   context.registerModType('inslimvml-mod-loader', 20, isSupported, getGamePath,
     (instructions: types.IInstruction[]) => {
@@ -512,13 +495,16 @@ function main(context: types.IExtensionContext) {
   context.registerModType('valheim-custom-textures', 10, isSupported,
     () => getGamePath() !== undefined ? path.join(modsPath(getGamePath()), 'CustomTextures') : undefined,
     (instructions: types.IInstruction[]) => {
-      const textureRgx: RegExp = new RegExp(/^texture_.*.png$/);
+      const textureRgx: RegExp = new RegExp(/.*tex.png$/);
       let supported = false;
       for (const instr of instructions) {
         const segments = (!!instr.source)
           ? instr.source.toLowerCase().split(path.sep)
           : [];
         if (segments.includes('customtextures')) {
+          // The existence of the customtextures folder suggests that the mod author
+          //  may have added additional functionality in his mod. We don't want to
+          //  mess with the files in this case.
           supported = false;
           break;
         }
@@ -591,6 +577,33 @@ function main(context: types.IExtensionContext) {
       if (gameMode !== GAME_ID) {
         return;
       }
+
+      // TODO: remove this once the extension manager migrations are fixed
+      const api = context.api;
+      const t = api.translate;
+      api.sendNotification({
+        id: 'valheim-update-1.1.0',
+        type: 'info',
+        message: 'Important Valheim Update Information',
+        actions: [
+          { title: 'More', action: (dismiss) => {
+            api.showDialog('info', 'Valheim Update 1.1.0', {
+              bbcode: t('Aside from updating the BepInEx payload to 5.4.22.[br][/br][br][/br]'
+                      + 'This update adds a new button to the mods page "Update BepInEx" which allows '
+                      + 'users to change the BepInEx version used by Vortex.[br][/br][br][/br]'
+                      + 'Available versions are pulled directly from the BepInEx github repository, '
+                      + 'and will maintain any existing configuration files in your game directory.[br][/br][br][/br]'
+                      + 'If for any reason the BepInEx payload deployed by Vortex is not ideal for your mod setup, and you '
+                      + 'require a custom version, the payload can be replaced manually using the "Open BepInEx Payload Folder" button '
+                      + 'which will open the location of the payload itself in your file browser. Any changes there will be reflected in '
+                      + 'your game directory upon deployment.', { ns: NAMESPACE }),
+            }, [ { label: 'Close', action: () => {
+              api.store.dispatch(actions.suppressNotification('valheim-update-1.1.0', true));
+              dismiss()
+            }, default: true } ]);
+          }}
+        ],
+      });
       releaseMap = await getReleaseMap(context.api);
     });
 
