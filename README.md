@@ -36,6 +36,8 @@ See below for known problems and fixes to common modding problems
 
 * The BepInEx payload and Denikson's unstripped assemblies package may become outdated whenever a major game update occurs causing mods to break. As is the case with most games, you will have to exercise some patience while the packages and mods get updated. Vortex downloading a new version of Denikson's package is a clear sign that the modding community has started reacting to the change.
 
+* Game asset replacers such as [HD Mods](https://www.nexusmods.com/valheim/mods/302) are not officially supported due issues that may arise when the game updates. Depending on how the mod is packaged, these mods can be functional if their modType is manually changed to "Engine Injector" which should deploy the files correctly. Please note you may be required to re-download and re-install such mods whenever a game update is released.
+
 ### Vortex's BepInEx payload
 
 Vortex's payload includes a tested BepInEx package (5.4.22 at this time) added with the InSlimVML plugin and "vortex-worlds" which users can use to load different world mods from the website. The payload itself can be modified using Vortex's "Update BepInEx" button found on the mods page which will allow users to replace the payload with official BepInEx [releases](https://github.com/BepInEx/BepInEx/releases) found on Github.
