@@ -317,6 +317,11 @@ function main(context: types.IExtensionContext) {
     return state.settings.gameMode.discovered?.[GAME_ID]?.path;
   };
 
+  const isValheimActive = (api: types.IExtensionApi) => {
+    const activeGameId = selectors.activeGameId(api.getState());
+    return (activeGameId === GAME_ID);
+  }
+
   const isSupported = (gameId: string) => (gameId === GAME_ID);
   const hasInstruction = (instructions: types.IInstruction[],
                           pred: (inst: types.IInstruction) => boolean) =>
@@ -407,18 +412,16 @@ function main(context: types.IExtensionContext) {
 
   context.registerAction('mod-icons', 100, 'folder-download', {}, 'Update BepInEx', () => {
     context.api.store.dispatch(setShowUpdateDialog(true))
-  });
+  }, () => isValheimActive(context.api));
   context.registerAction('mod-icons', 105, 'open-ext', {}, 'Open BepInEx Payload Folder', () => {
     payloadDeployer.openPayloadDir(context.api);
-  });
+  }, () => isValheimActive(context.api));
   context.registerAction('mod-icons', 115, 'import', {}, 'Import From r2modman', () => {
     migrateR2ToVortex(context.api);
   }, () => {
-    const state = context.api.getState();
-    const activeGameId = selectors.activeGameId(state);
-    return userHasR2Installed()
-      && (getGamePath() !== undefined)
-      && (activeGameId === GAME_ID);
+    return isValheimActive(context.api)
+      && userHasR2Installed()
+      && (getGamePath() !== undefined);
   });
 
   const dependencyTests = [ vbuildDepTest, customMeshesTest,

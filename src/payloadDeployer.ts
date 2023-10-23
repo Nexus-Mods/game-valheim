@@ -14,6 +14,10 @@ const BACKUP_EXT: string = '.vortex_backup';
 const CONFIG_EXT: string = '.cfg';
 
 export async function openPayloadDir(api: types.IExtensionApi) {
+  const activeGameId = selectors.activeGameId(api.store.getState());
+  if (activeGameId !== GAME_ID) {
+    return;
+  }
   util.opn(PAYLOAD_PATH);
 }
 
