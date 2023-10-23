@@ -1,28 +1,49 @@
+/* eslint-disable max-lines-per-function */
 import Bluebird from 'bluebird';
 import * as path from 'path';
 import { actions, fs, log, selectors, types, util } from 'vortex-api';
 import Parser, { IniFile, WinapiFormat } from 'vortex-parse-ini';
 import * as payloadDeployer from './payloadDeployer';
 
+import { createAction } from 'redux-act';
+
+import UpdateDialog from './views/UpdateDialog';
+
 import { generate } from 'shortid';
 
 import { UnstrippedAssemblyDownloader } from './unstrippedAssembly';
 
 import {
-  BETTER_CONT_EXT, CONF_MANAGER, FBX_EXT, GAME_ID, GAME_ID_SERVER,
+  BETTER_CONT_EXT, CONF_MANAGER, FBX_EXT, GAME_ID,
   genProps, guessModId, IGNORABLE_FILES, INSLIMVML_IDENTIFIER,
-  IProps, ISCMDProps, NEXUS, OBJ_EXT, PackType, removeDir, STEAM_ID, VBUILD_EXT, walkDirPath,
+  IProps, NAMESPACE, OBJ_EXT, PackType, removeDir, STEAM_ID, VBUILD_EXT, walkDirPath,
 } from './common';
 import { installBetterCont, installCoreRemover, installFullPack, installInSlimModLoader,
-  installVBuildMod, testBetterCont, testCoreRemover, testFullPack, testInSlimModLoader,
-  testVBuild, testConfManager, installConfManager } from './installers';
-import { migrate1013, migrate1015, migrate103, migrate104, migrate106, migrate109 } from './migrations';
+         installVBuildMod, testBetterCont, testCoreRemover, testFullPack, testInSlimModLoader,
+         testVBuild, testConfManager, installConfManager } from './installers';
+
+// Migrations are broken.
+// import { migrate1013, migrate1015, migrate110, migrate103, migrate104, migrate106, migrate109 } from './migrations';
 import { hasMultipleLibMods, isDependencyRequired } from './tests';
 
 import { migrateR2ToVortex, userHasR2Installed } from './r2Vortex';
 
-import { checkConfigManagerUpd, downloadConfigManager } from './githubDownloader';
+import { getReleaseMap } from './githubDownloader';
 import { IEntry } from 'turbowalk';
+import { IReleaseMap } from './types';
+
+// actions
+const setShowUpdateDialog = createAction('VAL_SHOW_UPDATE_DIALOG', show => show);
+
+// reducer
+const reducer: types.IReducerSpec = {
+  reducers: {
+    [setShowUpdateDialog as any]: (state, payload) => util.setSafe(state, ['showUpdateDialog'], payload),
+  },
+  defaults: {
+    showUpdateDialog: false,
+  },
+};
 
 const STOP_PATTERNS = ['plugins', 'patchers'];
 function toWordExp(input) {
@@ -53,35 +74,14 @@ async function ensureUnstrippedAssemblies(props: IProps): Promise<void> {
   const api = props.api;
   const t = api.translate;
   const expectedFilePath = path.join(props.discovery.path,
-    'unstripped_managed', 'mono.security.dll');
+                                     'unstripped_managed', 'mono.security.dll');
   const fullPackCorLibOld = path.join(props.discovery.path,
-    'BepInEx', 'core_lib', 'mono.security.dll');
+                                      'BepInEx', 'core_lib', 'mono.security.dll');
   const fullPackCorLibNew = path.join(props.discovery.path,
-    'unstripped_corlib', 'mono.security.dll');
-
-  // const url = path.join(NEXUS, 'valheim', 'mods', '1202') + `?tab=files&file_id=4899&nmm=1`;
-  // const raiseMissingAssembliesDialog = () => new Promise<void>((resolve, reject) => {
-  //   api.showDialog('info', 'Missing unstripped assemblies', {
-  //     bbcode: t('Valheim\'s assemblies are distributed in an "optimised" state to reduce required '
-  //     + 'disk space. This unfortunately means that Valheim\'s modding capabilities are also affected.{{br}}{{br}}'
-  //     + 'In order to mod Valheim, the unoptimised/unstripped assemblies are required - please download these '
-  //     + 'from Nexus Mods.{{br}}{{br}} You can choose the Vortex/mod manager download or manual download '
-  //     + '(simply drag and drop the archive into the mods dropzone to add it to Vortex).{{br}}{{br}}'
-  //     + 'Vortex will then be able to install the assemblies where they are needed to enable '
-  //     + 'modding, leaving the original ones untouched.', { replace: { br: '[br][/br]' } }),
-  //   }, [
-  //     { label: 'Cancel', action: () => reject(new util.UserCanceled()) },
-  //     {
-  //       label: 'Download Unstripped Assemblies',
-  //       action: () => util.opn(url)
-  //         .catch(err => null)
-  //         .finally(() => resolve()),
-  //     },
-  //   ]);
-  // });
+                                      'unstripped_corlib', 'mono.security.dll');
 
   const raiseForceDownloadNotif = () => api.sendNotification({
-    message: t('Game updated - Updated assemblies pack required.'),
+    message: t('Game updated - Updated assemblies pack required.', { ns: NAMESPACE }),
     type: 'info',
     id: 'forceDownloadNotif',
     noDismiss: true,
@@ -94,7 +94,7 @@ async function ensureUnstrippedAssemblies(props: IProps): Promise<void> {
                   + 'Vortex has detected that you have previously installed unstripped Unity assemblies / a BepInEx pack, but cannot know for sure whether these files are up to date. '
                   + 'If you are unsure, Vortex can download and install the latest required files for you.{{lb}}'
                   + 'Please note that all mods must also be updated in order for them to function with the new game version.',
-                  { replace: { lb: '[br][/br][br][/br]', br: '[br][/br]' } }),
+                    { ns: NAMESPACE, replace: { lb: '[br][/br][br][/br]', br: '[br][/br]' } }),
         }, [
           { label: 'Close' },
           {
@@ -150,36 +150,36 @@ async function ensureUnstrippedAssemblies(props: IProps): Promise<void> {
       // Give it a second for the download to register in the state.
       await new Promise((resolve, reject) =>
         api.events.emit('import-downloads', [ archiveFilePath ], async (dlIds: string[]) => {
-        if (dlIds.length === 0) {
-          return reject(new util.ProcessCanceled('Failed to import archive'));
-        }
-
-        try {
-          for (const dlId of dlIds) {
-            await new Promise((res2, rej2) =>
-              api.events.emit('start-install-download', dlId, true, (err, modId) => {
-              if (err) {
-                return rej2(err);
-              }
-              api.store.dispatch(actions.setModEnabled(props.profile.id, modId, true));
-              return res2(undefined);
-            }));
+          if (dlIds.length === 0) {
+            return reject(new util.ProcessCanceled('Failed to import archive'));
           }
-        } catch (err) {
-          return reject(err);
-        }
 
-        api.store.dispatch(actions.suppressNotification('forceDownloadNotif', true));
-        api.store.dispatch(actions.setDeploymentNecessary(GAME_ID, true));
-        await assignOverridePath('unstripped_corlib');
-        try {
-          await removeDir(tempPath);
-          await fs.removeAsync(tempPath).catch(err => err.code === 'ENOENT');
-        } catch (err) {
-          log('error', 'failed to cleanup temporary files');
-        }
-        return resolve(undefined);
-      }));
+          try {
+            for (const dlId of dlIds) {
+              await new Promise((res2, rej2) =>
+                api.events.emit('start-install-download', dlId, true, (err, modId) => {
+                  if (err) {
+                    return rej2(err);
+                  }
+                  api.store.dispatch(actions.setModEnabled(props.profile.id, modId, true));
+                  return res2(undefined);
+                }));
+            }
+          } catch (err) {
+            return reject(err);
+          }
+
+          api.store.dispatch(actions.suppressNotification('forceDownloadNotif', true));
+          api.store.dispatch(actions.setDeploymentNecessary(GAME_ID, true));
+          await assignOverridePath('unstripped_corlib');
+          try {
+            await removeDir(tempPath);
+            await fs.removeAsync(tempPath).catch(err => err.code === 'ENOENT');
+          } catch (err) {
+            log('error', 'failed to cleanup temporary files');
+          }
+          return resolve(undefined);
+        }));
     } catch (err) {
       try {
         const tempPath = path.join(util.getVortexPath('temp'), folderName);
@@ -198,9 +198,9 @@ async function ensureUnstrippedAssemblies(props: IProps): Promise<void> {
     util.getSafe(props.state, ['persistent', 'mods', GAME_ID], {});
   const coreLibModIds = Object.keys(mods).filter(key => {
     const hasCoreLibType = util.getSafe(mods[key],
-      ['attributes', 'CoreLibType'], undefined) !== undefined;
+                                        ['attributes', 'CoreLibType'], undefined) !== undefined;
     const isEnabled = util.getSafe(props.profile,
-      ['modState', key, 'enabled'], false);
+                                   ['modState', key, 'enabled'], false);
     return hasCoreLibType && isEnabled;
   });
 
@@ -243,12 +243,13 @@ async function ensureUnstrippedAssemblies(props: IProps): Promise<void> {
       if (util.getSafe(props.profile, ['modState', modId, 'enabled'], false)) {
         const dlid = mods[modId].archiveId;
         const download: types.IDownload = util.getSafe(api.getState(),
-          ['persistent', 'downloads', 'files', dlid], undefined);
+                                                       ['persistent', 'downloads', 'files', dlid], undefined);
         if (download?.localPath !== undefined && guessModId(download.localPath) !== '15') {
           // The Nexus Mods unstripped assmeblies mod is enabled - don't raise the missing
           //  assemblies dialog.
-          const dllOverridePath = expectedFilePath.replace(props.discovery.path + path.sep, '')
-                                            .replace(path.sep + 'mono.security.dll', '');
+          const dllOverridePath = expectedFilePath
+            .replace(props.discovery.path + path.sep, '')
+            .replace(path.sep + 'mono.security.dll', '');
           await assignOverridePath(dllOverridePath);
           return;
         }
@@ -277,7 +278,7 @@ function prepareForModding(context: types.IExtensionContext, discovery: types.ID
     .then(() => payloadDeployer.onWillDeploy(context, profile?.id))
     .then(() => resolve())
     .catch(err => reject(err)))
-  .then(() => ensureUnstrippedAssemblies({ api: context.api, state, profile, discovery }));
+    .then(() => ensureUnstrippedAssemblies({ api: context.api, state, profile, discovery }));
 }
 
 function modsPath(gamePath: string) {
@@ -285,6 +286,8 @@ function modsPath(gamePath: string) {
 }
 
 function main(context: types.IExtensionContext) {
+  context.registerReducer(['session', 'valheim'], reducer);
+  let releaseMap: IReleaseMap = {};
   context.registerGame({
     id: GAME_ID,
     name: 'Valheim',
@@ -309,35 +312,15 @@ function main(context: types.IExtensionContext) {
     },
   });
 
-  // context.registerGame({
-  //   id: GAME_ID_SERVER,
-  //   name: 'Valheim: Dedicated Server',
-  //   mergeMods: true,
-  //   queryPath: () => undefined,
-  //   queryModPath: modsPath,
-  //   logo: 'gameart.jpg',
-  //   executable: () => 'start_headless_server.bat',
-  //   requiresLauncher,
-  //   setup: discovery => prepareForModding(context, discovery),
-  //   requiredFiles: [
-  //     'start_headless_server.bat',
-  //   ],
-  //   environment: {
-  //     SteamAPPId: STEAM_ID,
-  //   },
-  //   details: {
-  //     nexusPageId: GAME_ID,
-  //     steamAppId: +STEAM_ID,
-  //     stopPatterns: STOP_PATTERNS.map(toWordExp),
-  //     ignoreConflicts: IGNORABLE_FILES,
-  //     ignoreDeploy: IGNORABLE_FILES,
-  //   },
-  // });
-
   const getGamePath = () => {
     const state = context.api.getState();
     return state.settings.gameMode.discovered?.[GAME_ID]?.path;
   };
+
+  const isValheimActive = (api: types.IExtensionApi) => {
+    const activeGameId = selectors.activeGameId(api.getState());
+    return (activeGameId === GAME_ID);
+  }
 
   const isSupported = (gameId: string) => (gameId === GAME_ID);
   const hasInstruction = (instructions: types.IInstruction[],
@@ -360,10 +343,10 @@ function main(context: types.IExtensionContext) {
     if (gamePath === undefined) {
       return undefined;
     }
-    const buildShareAssembly = path.join(gamePath, 'InSlimVML', 'Mods', 'CR-BuildShare_VML.dll');
+    const buildShareAssembly = path.join(modsPath(gamePath), 'BuildShareV2.dll');
     return isDependencyRequired(context.api, {
       dependentModType: 'vbuild-mod',
-      masterModType: 'inslimvml-mod',
+      masterModType: '',
       masterName: 'BuildShare (AdvancedBuilding)',
       masterURL: 'https://www.nexusmods.com/valheim/mods/5',
       requiredFiles: [ buildShareAssembly ],
@@ -415,33 +398,30 @@ function main(context: types.IExtensionContext) {
     });
   };
 
-  // context.registerAction('mod-icons', 100, 'steamcmd', {}, 'SteamCMD Dedicated Server', () => {
-  //   context.api.selectDir({})
-  //     .then((selectedPath: string) => {
-  //       if (selectedPath) {
-  //         const props: ISCMDProps = {
-  //           gameId: GAME_ID_SERVER,
-  //           steamAppId: +STEAM_ID,
-  //           arguments: [
-  //             { argument: 'force_install_dir', value: selectedPath },
-  //             { argument: 'quit' },
-  //           ],
-  //           callback: ((err, data) => null),
-  //         };
-  //         context.api.ext.scmdStartDedicatedServer(props);
-  //       }
-  //     })
-  //     .catch(err => null);
-  // }, () => context.api.ext?.scmdStartDedicatedServer !== undefined);
+  context.registerDialog('valheim-update-dialog', UpdateDialog, () => ({
+    releaseMap: releaseMap,
+    onClose: () => context.api.store.dispatch(setShowUpdateDialog(false)),
+    onConfirm: (tag: string) => {
+      const release = releaseMap[tag];
+      if (release !== undefined) {
+        payloadDeployer.replacePayload(context.api, release);
+      }
+      context.api.store.dispatch(setShowUpdateDialog(false));
+    }
+  }));
 
+  context.registerAction('mod-icons', 100, 'folder-download', {}, 'Update BepInEx', () => {
+    context.api.store.dispatch(setShowUpdateDialog(true))
+  }, () => isValheimActive(context.api));
+  context.registerAction('mod-icons', 105, 'open-ext', {}, 'Open BepInEx Payload Folder', () => {
+    payloadDeployer.openPayloadDir(context.api);
+  }, () => isValheimActive(context.api));
   context.registerAction('mod-icons', 115, 'import', {}, 'Import From r2modman', () => {
     migrateR2ToVortex(context.api);
   }, () => {
-    const state = context.api.getState();
-    const activeGameId = selectors.activeGameId(state);
-    return userHasR2Installed()
-      && (getGamePath() !== undefined)
-      && (activeGameId === GAME_ID);
+    return isValheimActive(context.api)
+      && userHasR2Installed()
+      && (getGamePath() !== undefined);
   });
 
   const dependencyTests = [ vbuildDepTest, customMeshesTest,
@@ -453,9 +433,9 @@ function main(context: types.IExtensionContext) {
   }
 
   context.registerTest('multiple-lib-mods', 'gamemode-activated',
-    () => hasMultipleLibMods(context.api));
+                       () => hasMultipleLibMods(context.api));
   context.registerTest('multiple-lib-mods', 'mod-installed',
-    () => hasMultipleLibMods(context.api));
+                       () => hasMultipleLibMods(context.api));
 
   context.registerInstaller('valheim-better-continents', 20, testBetterCont, installBetterCont);
   context.registerInstaller('valheim-core-remover', 20, testCoreRemover, installCoreRemover);
@@ -464,12 +444,15 @@ function main(context: types.IExtensionContext) {
   context.registerInstaller('valheim-full-bep-pack', 10, testFullPack, installFullPack);
   context.registerInstaller('valheim-config-manager', 10, testConfManager, installConfManager)
 
-  context.registerMigration((oldVersion: string) => migrate103(context.api, oldVersion));
-  context.registerMigration((oldVersion: string) => migrate104(context.api, oldVersion));
-  context.registerMigration((oldVersion: string) => migrate106(context.api, oldVersion));
-  context.registerMigration((oldVersion: string) => migrate109(context.api, oldVersion));
-  context.registerMigration((oldVersion: string) => migrate1013(context.api, oldVersion));
-  context.registerMigration((oldVersion: string) => migrate1015(context.api, oldVersion));
+  // Migrations in the extension manager are broken and are crashing the renderer thread!
+  //  will uncomment these once the issue is fixed.
+  // context.registerMigration((oldVersion: string) => migrate103(context.api, oldVersion));
+  // context.registerMigration((oldVersion: string) => migrate104(context.api, oldVersion));
+  // context.registerMigration((oldVersion: string) => migrate106(context.api, oldVersion));
+  // context.registerMigration((oldVersion: string) => migrate109(context.api, oldVersion));
+  // context.registerMigration((oldVersion: string) => migrate1013(context.api, oldVersion));
+  // context.registerMigration((oldVersion: string) => migrate1015(context.api, oldVersion));
+  // context.registerMigration((oldVersion: string) => migrate110(context.api, oldVersion));
 
   context.registerModType('inslimvml-mod-loader', 20, isSupported, getGamePath,
     (instructions: types.IInstruction[]) => {
@@ -515,13 +498,16 @@ function main(context: types.IExtensionContext) {
   context.registerModType('valheim-custom-textures', 10, isSupported,
     () => getGamePath() !== undefined ? path.join(modsPath(getGamePath()), 'CustomTextures') : undefined,
     (instructions: types.IInstruction[]) => {
-      const textureRgx: RegExp = new RegExp(/^texture_.*.png$/);
+      const textureRgx: RegExp = new RegExp(/.*tex.png$/);
       let supported = false;
       for (const instr of instructions) {
         const segments = (!!instr.source)
           ? instr.source.toLowerCase().split(path.sep)
           : [];
         if (segments.includes('customtextures')) {
+          // The existence of the customtextures folder suggests that the mod author
+          //  may have added additional functionality in his mod. We don't want to
+          //  mess with the files in this case.
           supported = false;
           break;
         }
@@ -590,13 +576,39 @@ function main(context: types.IExtensionContext) {
     context.api.onAsync('did-purge', async (profileId) =>
       payloadDeployer.onDidPurge(context.api, profileId));
 
-    context.api.events.on('gamemode-activated',
-      async (gameMode: string) => (gameMode === GAME_ID)
-        ? checkConfigManagerUpd(context.api, true) : null);
+    context.api.events.on('gamemode-activated', async (gameMode: string) => {
+      if (gameMode !== GAME_ID) {
+        return;
+      }
 
-    context.api.events.on('check-mods-version',
-      (gameId: string, mods: types.IMod[]) => (gameId === GAME_ID)
-        ? checkConfigManagerUpd(context.api) : null);
+      // TODO: remove this once the extension manager migrations are fixed
+      const api = context.api;
+      const t = api.translate;
+      api.sendNotification({
+        id: 'valheim-update-1.1.0',
+        type: 'info',
+        message: 'Important Valheim Update Information',
+        actions: [
+          { title: 'More', action: (dismiss) => {
+            api.showDialog('info', 'Valheim Update 1.1.0', {
+              bbcode: t('Aside from updating the BepInEx payload to 5.4.22.[br][/br][br][/br]'
+                      + 'This update adds a new button to the mods page "Update BepInEx" which allows '
+                      + 'users to change the BepInEx version used by Vortex.[br][/br][br][/br]'
+                      + 'Available versions are pulled directly from the BepInEx github repository, '
+                      + 'and will maintain any existing configuration files in your game directory.[br][/br][br][/br]'
+                      + 'If for any reason the BepInEx payload deployed by Vortex is not ideal for your mod setup, and you '
+                      + 'require a custom version, the payload can be replaced manually using the "Open BepInEx Payload Folder" button '
+                      + 'which will open the location of the payload itself in your file browser. Any changes there will be reflected in '
+                      + 'your game directory upon deployment.', { ns: NAMESPACE }),
+            }, [ { label: 'Close', action: () => {
+              api.store.dispatch(actions.suppressNotification('valheim-update-1.1.0', true));
+              dismiss()
+            }, default: true } ]);
+          }}
+        ],
+      });
+      releaseMap = await getReleaseMap(context.api);
+    });
 
     context.api.events.on('did-install-mod', async (gameId, archiveId, modId) => {
       if (gameId !== GAME_ID) {

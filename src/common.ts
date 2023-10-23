@@ -20,6 +20,8 @@ export const ISVML_SKIP = [BIX_SVML, 'slimassist.dll', '0harmony.dll'];
 
 export const NEXUS = 'www.nexusmods.com';
 
+export const NAMESPACE = 'game-valheim';
+
 // These are files which are crucial to Valheim's modding pattern and it appears
 //  that many mods on Vortex are currently distributing these as part of their mod.
 //  Needless to say, we don't want these deployed or reporting any conflicts as
@@ -57,10 +59,9 @@ export async function walkDirPath(dirPath: string): Promise<IEntry[]> {
   await turbowalk(dirPath, (entries: IEntry[]) => {
     fileEntries = fileEntries.concat(entries);
   })
-  .catch({ systemCode: 3 }, () => Promise.resolve())
-  .catch(err => ['ENOTFOUND', 'ENOENT'].includes(err.code)
-    ? Promise.resolve() : Promise.reject(err));
-
+    .catch({ systemCode: 3 }, () => Promise.resolve())
+    .catch(err => ['ENOTFOUND', 'ENOENT'].includes(err.code)
+      ? Promise.resolve() : Promise.reject(err));
   return fileEntries;
 }
 
@@ -118,8 +119,9 @@ export function guessModId(fileName: string): string {
   }
 }
 
-export async function removeDir(filePath: string) {
-  const filePaths = await walkDirPath(filePath);
+export async function removeDir(filePath: string, filterEntries?: (entry: IEntry) => boolean) {
+  let filePaths = await walkDirPath(filePath);
+  filePaths = !filterEntries ? filePaths : filePaths.filter(filterEntries);
   filePaths.sort((lhs, rhs) => rhs.filePath.length - lhs.filePath.length);
   for (const entry of filePaths) {
     try {
@@ -128,4 +130,14 @@ export async function removeDir(filePath: string) {
       log('debug', 'failed to remove file', err);
     }
   }
+}
+
+export function purge(api: types.IExtensionApi) {
+  return new Promise<void>((resolve, reject) =>
+    api.events.emit('purge-mods', true, (err) => err ? reject(err) : resolve()));
+}
+
+export function deploy(api: types.IExtensionApi) {
+  return new Promise<void>((resolve, reject) =>
+    api.events.emit('deploy-mods', (err) => err ? reject(err) : resolve()));
 }
