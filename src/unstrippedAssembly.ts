@@ -1,6 +1,9 @@
+/* eslint-disable */
 import * as path from 'path';
 
-import { fs } from 'vortex-api';
+import { fs, util } from 'vortex-api';
+
+type DownloadExists = (fullName: string) => boolean;
 
 export class UnstrippedAssemblyDownloader {
   private mTempPath: string;
@@ -8,7 +11,7 @@ export class UnstrippedAssemblyDownloader {
     this.mTempPath = tempPath;
   }
 
-  public async downloadNewest(searchType: SearchType, value: string): Promise<string> {
+  public async downloadNewest(searchType: SearchType, value: string, exists?: DownloadExists): Promise<string> {
     const pred = searchType === 'full_name'
       ? (ent: IManifestEntry) => ent.full_name === value
       : (ent: IManifestEntry) => ent.uuid4 === value;
@@ -16,6 +19,9 @@ export class UnstrippedAssemblyDownloader {
       const manifestEntry = await this.findManifestEntry(value, pred);
       const latestVer = manifestEntry.versions[0];
       const dest = path.join(this.mTempPath, latestVer.full_name + '.zip');
+      if (exists !== undefined && exists(path.basename(dest))) {
+        return Promise.reject(new util.ProcessCanceled('Download already exists'));
+      }
       await this.fetchFileFromUrl(latestVer.download_url, dest);
       return Promise.resolve(dest);
     } catch (err) {
