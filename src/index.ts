@@ -1,4 +1,4 @@
-/* eslint-disable max-lines-per-function */
+/* eslint-disable */
 import Bluebird from 'bluebird';
 import * as path from 'path';
 import { actions, fs, log, selectors, types, util } from 'vortex-api';
@@ -125,6 +125,15 @@ async function ensureUnstrippedAssemblies(props: IProps): Promise<void> {
     }
   };
 
+  const archiveExists = (archive: string) => {
+    const downloads: { [arcId: string]: types.IDownload } = util.getSafe(api.getState(), ['persistent', 'downloads', 'files'], {});
+    const download = Object.values(downloads).find(dl => dl.localPath === archive);
+    if (download !== undefined) {
+      return true;
+    }
+    return false;
+  }
+
   const runDownloader = async () => {
     const downloader = new UnstrippedAssemblyDownloader(util.getVortexPath('temp'));
     const folderName = generate();
@@ -135,7 +144,7 @@ async function ensureUnstrippedAssemblies(props: IProps): Promise<void> {
         //  when the active gameMode is undefined.
         throw new util.ProcessCanceled('Wrong gamemode');
       }
-      const archiveFilePath = await downloader.downloadNewest('full_name', 'denikson-BepInExPack_Valheim');
+      const archiveFilePath = await downloader.downloadNewest('full_name', 'denikson-BepInExPack_Valheim', archiveExists);
       // Unfortunately we can't really validate the download's integrity; but we
       //  can at the very least make sure it's there and isn't just an empty archive.
       await fs.statAsync(archiveFilePath);
@@ -190,7 +199,9 @@ async function ensureUnstrippedAssemblies(props: IProps): Promise<void> {
         // Cleanup failed or is unnecessary.
       }
       log('debug', 'unstripped assembly downloader failed', err);
-      // return raiseMissingAssembliesDialog();
+      if (err instanceof util.ProcessCanceled) {
+        return Promise.resolve();
+      }
     }
   };
 
