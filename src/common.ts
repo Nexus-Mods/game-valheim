@@ -32,7 +32,7 @@ export const IGNORABLE_FILES = [
   'BepInEx.Preloader.dll', 'BepInEx.Preloader.xml', 'BepInEx.xml', 'HarmonyXInterop.dll',
   'Mono.Cecil.dll', 'Mono.Cecil.Mdb.dll', 'Mono.Cecil.Pdb.dll', 'Mono.Cecil.Rocks.dll',
   'MonoMod.RuntimeDetour.dll', 'MonoMod.RuntimeDetour.xml', 'MonoMod.Utils.dll',
-  'MonoMod.Utils.xml',
+  'MonoMod.Utils.xml', 'CHANGELOG.md', 'icon.png', 'manifest.json'
 ];
 
 export interface IProps {
